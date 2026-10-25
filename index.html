@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- build:artifact-start -->
+<title>Coin Express</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rye&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="src/ui/style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="map" aria-label="Railroad map"></canvas>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">Coin Express</span>
+      <span class="company" id="company-name">Coin Express Rail Co.</span>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="stat-label">Cash</span><span class="stat-value" id="cash">$0</span></div>
+      <div class="stat"><span class="stat-label">Date</span><span class="stat-value" id="date">Jan 1, 1850</span></div>
+    </div>
+    <div class="speed" role="group" aria-label="Game speed">
+      <button type="button" class="speed-btn" data-speed="0" title="Pause (Space)" aria-label="Pause">❚❚</button>
+      <button type="button" class="speed-btn" data-speed="1" title="Normal speed" aria-label="Normal speed">▶</button>
+      <button type="button" class="speed-btn" data-speed="2" title="Fast" aria-label="Fast">▶▶</button>
+      <button type="button" class="speed-btn" data-speed="3" title="Fastest" aria-label="Fastest">▶▶▶</button>
+    </div>
+    <div class="top-actions">
+      <button type="button" class="ghost-btn" id="help-btn">How to play</button>
+      <button type="button" class="ghost-btn" id="menu-btn">Game</button>
+    </div>
+  </header>
+
+  <nav class="toolbar" aria-label="Tools">
+    <button type="button" class="tool" data-tool="inspect"><span class="tool-key">1</span><span class="tool-name">Inspect</span></button>
+    <button type="button" class="tool" data-tool="track"><span class="tool-key">2</span><span class="tool-name">Lay track</span></button>
+    <button type="button" class="tool" data-tool="station"><span class="tool-key">3</span><span class="tool-name">Station</span></button>
+    <button type="button" class="tool" data-tool="bulldoze"><span class="tool-key">4</span><span class="tool-name">Bulldoze</span></button>
+    <button type="button" class="tool tool-train" id="new-train-btn"><span class="tool-key">5</span><span class="tool-name">Buy train</span></button>
+  </nav>
+
+  <div class="hint" id="hint" role="status"></div>
+
+  <aside class="panel" id="panel" aria-live="polite">
+    <div class="panel-head" id="panel-head"></div>
+    <div class="panel-live" id="panel-live"></div>
+    <div class="panel-actions" id="panel-actions"></div>
+  </aside>
+
+  <div class="ticker" id="ticker" role="log"></div>
+
+  <div class="modal" id="modal" hidden>
+    <div class="dialog" id="dialog" role="dialog" aria-modal="true"></div>
+  </div>
+</div>
+<!-- build:artifact-end -->
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

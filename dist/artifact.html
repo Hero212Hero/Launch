@@ -1,0 +1,2764 @@
+<title>Coin Express</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rye&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: the map fills the screen; a dispatcher's console of dark enamel panels
+   with brass fittings floats over it. One deliberate dark look in every theme. */
+:root {
+  --enamel: #161c1b;      /* panel ground */
+  --enamel-2: #212a28;    /* raised controls */
+  --rule: #35423e;        /* borders */
+  --text: #ece5d3;        /* lamp-lit paper */
+  --muted: #9fa699;
+  --brass: #d6a740;       /* the accent */
+  --brass-ink: #1b1608;
+  --livery: #c8402f;      /* company colour */
+  --good: #7cc47f;
+  --bad: #ec7563;
+  --font-display: 'Rye', 'Rockwell', 'Georgia', serif;
+  --font-body: 'Barlow Semi Condensed', 'Arial Narrow', 'Roboto Condensed', system-ui, sans-serif;
+  --radius: 6px;
+  color-scheme: dark;
+}
+
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: #22302a;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; color: inherit; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+#app { position: relative; height: 100%; overflow: hidden; }
+#map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+#map.panning { cursor: grabbing; }
+
+/* ---- top bar ---- */
+.topbar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px;
+  padding-block: 8px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: color-mix(in srgb, var(--enamel) 94%, transparent);
+  border-bottom: 1px solid var(--rule);
+  box-shadow: 0 2px 0 #0005;
+}
+.brand { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
+.brand-mark { font-family: var(--font-display); font-size: 22px; color: var(--brass); letter-spacing: 0.02em; }
+.company { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stats { display: flex; gap: 22px; }
+.stat { display: flex; flex-direction: column; }
+.stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.stat-value { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat-value.negative { color: var(--bad); }
+.speed { display: flex; border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; }
+.speed-btn { background: var(--enamel-2); border: 0; border-right: 1px solid var(--rule); padding: 7px 11px; font-size: 12px; letter-spacing: -0.12em; cursor: pointer; min-width: 40px; }
+.speed-btn:last-child { border-right: 0; }
+.speed-btn:hover { background: #2c3734; }
+.speed-btn.active { background: var(--brass); color: var(--brass-ink); }
+.top-actions { display: flex; gap: 8px; margin-left: auto; }
+.ghost-btn { background: transparent; border: 1px solid var(--rule); border-radius: var(--radius); padding: 7px 12px; cursor: pointer; }
+.ghost-btn:hover { border-color: var(--brass); color: var(--brass); }
+
+/* ---- toolbar ---- */
+.toolbar {
+  position: absolute; z-index: 5; left: 50%; transform: translateX(-50%);
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  display: flex; gap: 4px; padding: 5px;
+  background: color-mix(in srgb, var(--enamel) 95%, transparent);
+  border: 1px solid var(--rule); border-radius: 10px; box-shadow: 0 6px 18px #0007;
+  max-width: calc(100% - 32px);
+}
+.tool {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  background: transparent; border: 1px solid transparent; border-radius: var(--radius);
+  padding: 6px 12px; cursor: pointer; min-width: 64px;
+}
+.tool:hover { background: var(--enamel-2); }
+.tool.active { background: var(--enamel-2); border-color: var(--brass); color: var(--brass); }
+.tool-key { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tool-name { font-size: 14px; font-weight: 600; white-space: nowrap; }
+.tool-train { background: var(--livery); color: #fff6ea; }
+.tool-train:hover { background: #d9503e; }
+.tool-train .tool-key { color: #ffd9cf; }
+
+.hint {
+  position: absolute; z-index: 4; left: 50%; transform: translateX(-50%);
+  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+  max-width: min(560px, calc(100% - 32px));
+  background: color-mix(in srgb, var(--enamel) 92%, transparent); border: 1px solid var(--rule);
+  border-radius: var(--radius); padding: 7px 12px; font-size: 14px; text-align: center; pointer-events: none;
+}
+.hint:empty { display: none; }
+.hint b { color: var(--brass); font-weight: 600; }
+.hint .err { color: var(--bad); }
+
+/* ---- side panel ---- */
+.panel {
+  position: absolute; z-index: 5; top: 78px;
+  right: max(12px, env(safe-area-inset-right, 0px));
+  width: 320px; max-height: calc(100% - 190px); overflow-y: auto;
+  background: color-mix(in srgb, var(--enamel) 96%, transparent);
+  border: 1px solid var(--rule); border-radius: 10px; box-shadow: 0 8px 22px #0008;
+  padding: 14px 16px;
+}
+.panel-head h2 { font-family: var(--font-display); font-weight: 400; font-size: 20px; margin: 0; color: var(--text); text-wrap: balance; }
+.panel-head .kind { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--brass); }
+.panel-head .close { float: right; background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 4px; }
+.panel-live { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+.panel-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.panel-actions:empty { display: none; }
+.section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 4px; }
+.rows { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; font-variant-numeric: tabular-nums; }
+.rows .v { text-align: right; font-weight: 600; }
+.rows .v.good { color: var(--good); }
+.rows .v.bad { color: var(--bad); }
+.rows .total { border-top: 1px solid var(--rule); padding-top: 3px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; padding: 2px 8px 2px 6px; border-radius: 99px; background: var(--enamel-2); border: 1px solid var(--rule); }
+.chip i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; border: 1px solid #0006; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.pill { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 2px 7px; border-radius: 99px; }
+.pill.moving { background: #2f4a33; color: var(--good); }
+.pill.loading { background: #4a4122; color: var(--brass); }
+.pill.lost, .pill.noOrders { background: #512b26; color: var(--bad); }
+.list { display: flex; flex-direction: column; gap: 4px; }
+.list-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; padding: 6px 8px; border-radius: var(--radius); background: var(--enamel-2); border: 1px solid transparent; cursor: pointer; font-variant-numeric: tabular-nums; }
+.list-row:hover { border-color: var(--brass); }
+.list-row .sub { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+.goal-bar { height: 8px; border-radius: 4px; background: var(--enamel-2); border: 1px solid var(--rule); overflow: hidden; }
+.goal-bar span { display: block; height: 100%; background: var(--brass); }
+.news { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.news .cash { color: var(--good); }
+.cars { display: flex; gap: 3px; flex-wrap: wrap; }
+.car { width: 30px; height: 16px; border-radius: 3px; border: 1px solid #0007; position: relative; overflow: hidden; background: var(--enamel-2); }
+.car span { position: absolute; left: 0; bottom: 0; top: 0; }
+
+.btn { background: var(--enamel-2); border: 1px solid var(--rule); border-radius: var(--radius); padding: 8px 14px; cursor: pointer; font-weight: 600; }
+.btn:hover { border-color: var(--brass); }
+.btn.primary { background: var(--brass); color: var(--brass-ink); border-color: var(--brass); }
+.btn.primary:hover { background: #e6b850; }
+.btn.danger { color: var(--bad); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---- ticker ---- */
+.ticker {
+  position: absolute; z-index: 4; top: 78px;
+  left: max(12px, env(safe-area-inset-left, 0px));
+  display: flex; flex-direction: column; gap: 4px; max-width: 340px; pointer-events: none;
+}
+.ticker div { background: color-mix(in srgb, var(--enamel) 90%, transparent); border-left: 3px solid var(--brass); padding: 5px 10px; font-size: 13px; border-radius: 0 var(--radius) var(--radius) 0; animation: tick-in 0.25s ease-out; }
+.ticker div.cash { border-left-color: var(--good); }
+@keyframes tick-in { from { transform: translateX(-12px); opacity: 0; } }
+
+/* ---- dialogs ---- */
+.modal { position: absolute; inset: 0; z-index: 20; background: #0b0f0eb8; display: grid; place-items: center; padding: 16px; }
+.dialog {
+  width: min(560px, 100%); max-height: calc(100% - 16px); overflow-y: auto;
+  background: var(--enamel); border: 1px solid var(--rule); border-radius: 12px; box-shadow: 0 18px 40px #000a;
+  padding: 22px 24px;
+}
+.dialog h1 { font-family: var(--font-display); font-weight: 400; font-size: 34px; color: var(--brass); margin: 0 0 4px; text-wrap: balance; }
+.dialog h2 { font-family: var(--font-display); font-weight: 400; font-size: 24px; margin: 0 0 4px; text-wrap: balance; }
+.dialog h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin: 18px 0 8px; font-weight: 600; }
+.dialog p { line-height: 1.45; margin: 6px 0; max-width: 62ch; }
+.dialog .lede { color: var(--muted); font-size: 16px; }
+.dialog .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.steps { margin: 6px 0 0; padding-left: 22px; line-height: 1.5; }
+.steps li { margin-bottom: 4px; }
+.steps b { color: var(--brass); font-weight: 600; }
+.loco-pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.loco-card { text-align: left; background: var(--enamel-2); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
+.loco-card.active { border-color: var(--brass); box-shadow: inset 0 0 0 1px var(--brass); }
+.loco-card strong { font-size: 16px; }
+.loco-card .specs { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stop-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.stop-row .num { width: 22px; height: 22px; border-radius: 50%; background: var(--livery); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none; }
+.stop-row select { flex: 1; min-width: 0; background: var(--enamel-2); border: 1px solid var(--rule); border-radius: var(--radius); padding: 7px 8px; color: var(--text); font: inherit; }
+.icon-btn { background: none; border: 1px solid var(--rule); border-radius: var(--radius); width: 32px; height: 32px; cursor: pointer; flex: none; }
+.icon-btn:hover { border-color: var(--bad); color: var(--bad); }
+.car-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; padding: 7px 0; border-top: 1px solid var(--rule); }
+.car-row .what { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.car-row .what i { width: 12px; height: 12px; border-radius: 3px; border: 1px solid #0007; }
+.car-row .note { grid-column: 1 / -1; font-size: 13px; color: var(--muted); }
+.counter { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.counter button { width: 30px; height: 30px; border-radius: var(--radius); border: 1px solid var(--rule); background: var(--enamel-2); cursor: pointer; font-size: 16px; }
+.counter button:hover:not(:disabled) { border-color: var(--brass); }
+.counter span { min-width: 18px; text-align: center; font-weight: 700; }
+.warn { color: var(--bad); font-size: 14px; }
+.total-line { display: flex; justify-content: space-between; align-items: baseline; margin-top: 14px; font-size: 16px; font-variant-numeric: tabular-nums; }
+.total-line strong { font-size: 22px; }
+.name-input { width: 100%; box-sizing: border-box; background: var(--enamel-2); border: 1px solid var(--rule); border-radius: var(--radius); padding: 8px 10px; color: var(--text); font: inherit; }
+
+/* ---- phone ---- */
+@media (max-width: 720px) {
+  body { font-size: 14px; }
+  .topbar { gap: 6px 14px; }
+  .brand-mark { font-size: 18px; }
+  .company { display: none; }
+  .stat-value { font-size: 16px; }
+  .top-actions { margin-left: 0; }
+  .ghost-btn { padding: 6px 9px; }
+  .toolbar { left: max(8px, env(safe-area-inset-left, 0px)); right: max(8px, env(safe-area-inset-right, 0px)); transform: none; justify-content: space-between; max-width: none; }
+  .tool { min-width: 0; flex: 1; padding: 6px 4px; }
+  .tool-name { font-size: 12px; }
+  .tool-key { display: none; }
+  .hint { top: 100px; bottom: auto; }
+  .panel { top: auto; left: max(8px, env(safe-area-inset-left, 0px)); right: max(8px, env(safe-area-inset-right, 0px)); width: auto; bottom: calc(72px + env(safe-area-inset-bottom, 0px)); max-height: 38%; padding: 10px 12px; }
+  .panel.collapsed .panel-live, .panel.collapsed .panel-actions { display: none; }
+  .panel-head { cursor: pointer; }
+  .panel.collapsed .panel-head::after { content: 'Tap for details'; display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .ticker { display: none; }
+  .dialog { padding: 18px 16px; }
+  .dialog h1 { font-size: 28px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker div { animation: none; }
+}
+</style>
+
+<div id="app">
+  <canvas id="map" aria-label="Railroad map"></canvas>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">Coin Express</span>
+      <span class="company" id="company-name">Coin Express Rail Co.</span>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="stat-label">Cash</span><span class="stat-value" id="cash">$0</span></div>
+      <div class="stat"><span class="stat-label">Date</span><span class="stat-value" id="date">Jan 1, 1850</span></div>
+    </div>
+    <div class="speed" role="group" aria-label="Game speed">
+      <button type="button" class="speed-btn" data-speed="0" title="Pause (Space)" aria-label="Pause">❚❚</button>
+      <button type="button" class="speed-btn" data-speed="1" title="Normal speed" aria-label="Normal speed">▶</button>
+      <button type="button" class="speed-btn" data-speed="2" title="Fast" aria-label="Fast">▶▶</button>
+      <button type="button" class="speed-btn" data-speed="3" title="Fastest" aria-label="Fastest">▶▶▶</button>
+    </div>
+    <div class="top-actions">
+      <button type="button" class="ghost-btn" id="help-btn">How to play</button>
+      <button type="button" class="ghost-btn" id="menu-btn">Game</button>
+    </div>
+  </header>
+
+  <nav class="toolbar" aria-label="Tools">
+    <button type="button" class="tool" data-tool="inspect"><span class="tool-key">1</span><span class="tool-name">Inspect</span></button>
+    <button type="button" class="tool" data-tool="track"><span class="tool-key">2</span><span class="tool-name">Lay track</span></button>
+    <button type="button" class="tool" data-tool="station"><span class="tool-key">3</span><span class="tool-name">Station</span></button>
+    <button type="button" class="tool" data-tool="bulldoze"><span class="tool-key">4</span><span class="tool-name">Bulldoze</span></button>
+    <button type="button" class="tool tool-train" id="new-train-btn"><span class="tool-key">5</span><span class="tool-name">Buy train</span></button>
+  </nav>
+
+  <div class="hint" id="hint" role="status"></div>
+
+  <aside class="panel" id="panel" aria-live="polite">
+    <div class="panel-head" id="panel-head"></div>
+    <div class="panel-live" id="panel-live"></div>
+    <div class="panel-actions" id="panel-actions"></div>
+  </aside>
+
+  <div class="ticker" id="ticker" role="log"></div>
+
+  <div class="modal" id="modal" hidden>
+    <div class="dialog" id="dialog" role="dialog" aria-modal="true"></div>
+  </div>
+</div>
+<script>
+(() => {
+'use strict';
+// ---- src/core/data.js ----
+// Game rules and tuning numbers. Everything the simulation balances on lives here,
+// so tweaking the economy never means hunting through logic files.
+
+const TICKS_PER_DAY = 8;
+const DAYS_PER_MONTH = 30; // simplified calendar: 12 months of 30 days
+const START_YEAR = 1850;
+const GOAL_YEAR = 1860;
+const GOAL_CASH = 1000000;
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const MAP_W = 72;
+const MAP_H = 52;
+const CATCHMENT = 2; // a station gathers from tiles within this many steps
+
+// Terrain ids stored in map.terrain.
+const GRASS = 0;
+const FOREST = 1;
+const HILL = 2;
+const WATER = 3;
+const TERRAIN = [
+  { name: 'Grassland', cost: 1 },
+  { name: 'Forest', cost: 1.4 },
+  { name: 'Hills', cost: 2.4 },
+  { name: 'Water', cost: 6 }, // bridge
+];
+const TOWN_TILE_COST = 2.5; // buying out buildings in the way
+
+// rate: dollars paid per unit per tile of distance, before the speed bonus.
+// decayDays: how quickly the cargo loses value in transit.
+const CARGO = {
+  passengers: { name: 'Passengers', color: '#e9d6a0', rate: 8, decayDays: 48 },
+  mail: { name: 'Mail', color: '#c9d8f0', rate: 12, decayDays: 36 },
+  coal: { name: 'Coal', color: '#2f2c2a', rate: 6, decayDays: 280 },
+  lumber: { name: 'Lumber', color: '#a8743f', rate: 6.5, decayDays: 220 },
+  grain: { name: 'Grain', color: '#e2b93b', rate: 7, decayDays: 140 },
+  steel: { name: 'Steel', color: '#8d9aa6', rate: 8.5, decayDays: 280 },
+  goods: { name: 'Goods', color: '#b5527a', rate: 9.5, decayDays: 120 },
+};
+const CARGO_IDS = Object.keys(CARGO);
+
+// base: units produced per month for raw producers.
+// converts: processors turn delivered input into output one-for-one the next month.
+const INDUSTRY_TYPES = {
+  coalMine: { name: 'Coal Mine', produces: ['coal'], accepts: [], base: 48, prefers: HILL, color: '#4b4540', mark: 'C' },
+  loggingCamp: { name: 'Logging Camp', produces: ['lumber'], accepts: [], base: 44, prefers: FOREST, color: '#5e7a3a', mark: 'L' },
+  farm: { name: 'Farm', produces: ['grain'], accepts: [], base: 40, prefers: GRASS, color: '#c9a640', mark: 'F' },
+  steelMill: { name: 'Steel Mill', produces: ['steel'], accepts: ['coal'], base: 0, converts: { coal: 'steel' }, prefers: GRASS, color: '#6f7d8a', mark: 'S' },
+  sawmill: { name: 'Sawmill', produces: ['goods'], accepts: ['lumber'], base: 0, converts: { lumber: 'goods' }, prefers: GRASS, color: '#8a5a3a', mark: 'W' },
+};
+const INDUSTRY_COUNTS = { coalMine: 3, loggingCamp: 3, farm: 3, steelMill: 2, sawmill: 2 };
+
+const TOWN_ACCEPTS = ['passengers', 'mail', 'goods', 'grain', 'steel'];
+const TOWN_NAMES = [
+  'Ashford', 'Millbrook', 'Cedar Falls', 'Harlow', 'Kingsbridge', 'Redwater',
+  'Fairhaven', 'Stonegate', 'Willow Bend', 'Dunmore', 'Bramley', 'Oakridge',
+];
+
+// speed: tiles per day on flat track with no cars.
+const LOCOS = [
+  { id: 'american', name: '4-4-0 American', price: 42000, speed: 1.8, maxCars: 5, upkeep: 9000, blurb: 'Quick and cheap. Best for passengers and mail.' },
+  { id: 'mogul', name: '2-6-0 Mogul', price: 60000, speed: 1.4, maxCars: 8, upkeep: 12000, blurb: 'Slower, but pulls long freight trains.' },
+];
+const CAR = { price: 4000, capacity: 20, upkeep: 600 };
+
+const COSTS = {
+  trackPerTile: 1600,
+  station: 18000,
+  refund: 0.25, // share of track/station cost returned when bulldozed
+  trainResale: 0.5,
+  startCash: 300000,
+};
+
+const STATION_CAP = 300; // most cargo of one type a station platform holds
+const STATION_SPOIL = 0.9; // share of waiting cargo kept each month
+const LOAD_DAYS = 2;
+
+// ---- src/core/rng.js ----
+// Seeded random numbers kept inside the game state, so a saved game (or a replay
+// of its command log) always rolls the same dice. Mulberry32.
+
+function rngNext(state) {
+  state.rng = (state.rng + 0x6d2b79f5) | 0;
+  let t = state.rng;
+  t = Math.imul(t ^ (t >>> 15), 1 | t);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+function rngInt(state, lo, hi) {
+  return lo + Math.floor(rngNext(state) * (hi - lo + 1));
+}
+
+function rngPick(state, list) {
+  return list[Math.floor(rngNext(state) * list.length)];
+}
+
+// ---- src/core/map.js ----
+// Tile helpers. The map is a grid stored as flat arrays; a tile is its array index.
+
+
+
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+function tileAt(map, x, y) {
+  if (x < 0 || y < 0 || x >= map.w || y >= map.h) return -1;
+  return y * map.w + x;
+}
+
+function tileX(map, t) {
+  return t % map.w;
+}
+
+function tileY(map, t) {
+  return Math.floor(t / map.w);
+}
+
+function tileDist(map, a, b) {
+  return Math.hypot(tileX(map, a) - tileX(map, b), tileY(map, a) - tileY(map, b));
+}
+
+// Tiles within the station catchment square around t.
+function tilesAround(map, t, r = CATCHMENT) {
+  const out = [];
+  const x0 = tileX(map, t);
+  const y0 = tileY(map, t);
+  for (let y = y0 - r; y <= y0 + r; y++) {
+    for (let x = x0 - r; x <= x0 + r; x++) {
+      const i = tileAt(map, x, y);
+      if (i >= 0) out.push(i);
+    }
+  }
+  return out;
+}
+
+// ---- src/core/world.js ----
+// Builds a new game: terrain, towns, industries and the player's company.
+
+
+
+
+
+function makeNoise(state, w, h, cell) {
+  const gw = Math.ceil(w / cell) + 2;
+  const gh = Math.ceil(h / cell) + 2;
+  const grid = [];
+  for (let i = 0; i < gw * gh; i++) grid.push(rngNext(state));
+  const smooth = (t) => t * t * (3 - 2 * t);
+  return (x, y) => {
+    const fx = x / cell;
+    const fy = y / cell;
+    const ix = Math.floor(fx);
+    const iy = Math.floor(fy);
+    const tx = smooth(fx - ix);
+    const ty = smooth(fy - iy);
+    const g = (gx, gy) => grid[gy * gw + gx];
+    const top = g(ix, iy) * (1 - tx) + g(ix + 1, iy) * tx;
+    const bottom = g(ix, iy + 1) * (1 - tx) + g(ix + 1, iy + 1) * tx;
+    return top * (1 - ty) + bottom * ty;
+  };
+}
+
+function generateTerrain(state) {
+  const { map } = state;
+  const broad = makeNoise(state, map.w, map.h, 13);
+  const detail = makeNoise(state, map.w, map.h, 5);
+  const woods = makeNoise(state, map.w, map.h, 7);
+  for (let y = 0; y < map.h; y++) {
+    for (let x = 0; x < map.w; x++) {
+      const h = broad(x, y) * 0.68 + detail(x, y) * 0.32;
+      let t = GRASS;
+      if (h < 0.3) t = WATER;
+      else if (h > 0.68) t = HILL;
+      else if (woods(x, y) > 0.62) t = FOREST;
+      map.terrain[tileAt(map, x, y)] = t;
+    }
+  }
+}
+
+function freeLand(state, t) {
+  const { map } = state;
+  return t >= 0 && map.terrain[t] !== WATER && map.town[t] < 0 && map.industry[t] < 0;
+}
+
+function placeTowns(state, count) {
+  const { map } = state;
+  const names = TOWN_NAMES.slice();
+  for (let attempt = 0; attempt < 4000 && state.towns.length < count; attempt++) {
+    const x = rngInt(state, 4, map.w - 5);
+    const y = rngInt(state, 4, map.h - 5);
+    const t = tileAt(map, x, y);
+    if (map.terrain[t] !== GRASS) continue;
+    if (state.towns.some((tw) => Math.hypot(tw.x - x, tw.y - y) < 15)) continue;
+    const name = names.splice(rngInt(state, 0, names.length - 1), 1)[0];
+    const town = { id: state.towns.length, name, x, y, tile: t, pop: rngInt(state, 350, 1600) };
+    state.towns.push(town);
+    // Houses spiral out from the centre; bigger towns sprawl further.
+    const houses = Math.round(town.pop / 70);
+    let placed = 0;
+    for (let r = 0; r <= 4 && placed < houses; r++) {
+      for (let dy = -r; dy <= r && placed < houses; dy++) {
+        for (let dx = -r; dx <= r && placed < houses; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const h = tileAt(map, x + dx, y + dy);
+          if (h < 0 || map.terrain[h] === WATER || map.town[h] >= 0) continue;
+          if (r > 0 && rngNext(state) < 0.3) continue;
+          map.town[h] = town.id;
+          placed++;
+        }
+      }
+    }
+  }
+}
+
+function nearestTown(state, x, y) {
+  let best = state.towns[0];
+  for (const t of state.towns) {
+    if (Math.hypot(t.x - x, t.y - y) < Math.hypot(best.x - x, best.y - y)) best = t;
+  }
+  return best;
+}
+
+function placeIndustry(state, typeId) {
+  const { map } = state;
+  const type = INDUSTRY_TYPES[typeId];
+  for (let attempt = 0; attempt < 3000; attempt++) {
+    const x = rngInt(state, 2, map.w - 4);
+    const y = rngInt(state, 2, map.h - 4);
+    const tiles = [tileAt(map, x, y), tileAt(map, x + 1, y), tileAt(map, x, y + 1), tileAt(map, x + 1, y + 1)];
+    if (!tiles.every((t) => freeLand(state, t))) continue;
+    // Early attempts insist on the preferred terrain; later ones take anything.
+    if (attempt < 1500 && map.terrain[tiles[0]] !== type.prefers) continue;
+    if (state.towns.some((tw) => Math.hypot(tw.x - x, tw.y - y) < 5)) continue;
+    if (state.industries.some((ind) => Math.hypot(ind.x - x, ind.y - y) < 6)) continue;
+    const id = state.industries.length;
+    const town = nearestTown(state, x, y);
+    for (const t of tiles) map.industry[t] = id;
+    state.industries.push({
+      id, type: typeId, name: `${town.name} ${type.name}`, x, y, tiles,
+      stock: {}, lastProduced: 0, lastShipped: 0,
+    });
+    return;
+  }
+}
+
+function createGame(seed = Math.floor(Math.random() * 1e9)) {
+  const n = MAP_W * MAP_H;
+  const state = {
+    version: 1,
+    seed,
+    rng: seed | 0,
+    tick: 0,
+    map: {
+      w: MAP_W, h: MAP_H,
+      terrain: new Array(n).fill(GRASS),
+      town: new Array(n).fill(-1),
+      industry: new Array(n).fill(-1),
+    },
+    towns: [],
+    industries: [],
+    stations: [],
+    trains: [],
+    track: {}, // "a-b" tile pair -> owning company id
+    companies: [{
+      id: 0,
+      name: 'Coin Express Rail Co.',
+      color: '#c8402f',
+      cash: COSTS.startCash,
+      month: emptyLedger(),
+      year: emptyLedger(),
+      lastYear: null,
+      history: [],
+    }],
+    messages: [],
+    nextId: 1,
+    commandLog: [],
+    outcome: null,
+    events: [], // short-lived notices for the screen; not part of the rules
+  };
+  generateTerrain(state);
+  placeTowns(state, 6);
+  for (const [typeId, count] of Object.entries(INDUSTRY_COUNTS)) {
+    for (let i = 0; i < count; i++) placeIndustry(state, typeId);
+  }
+  return state;
+}
+
+function emptyLedger() {
+  return { revenue: 0, construction: 0, trains: 0, upkeep: 0 };
+}
+
+// ---- src/core/track.js ----
+// The track network. A piece of track joins two neighbouring tiles (straight or
+// diagonal); the whole network is the set of those joins.
+
+
+
+
+function edgeKey(a, b) {
+  return a < b ? `${a}-${b}` : `${b}-${a}`;
+}
+
+function hasTrack(state, a, b) {
+  return state.track[edgeKey(a, b)] !== undefined;
+}
+
+function trackNeighbors(state, t) {
+  const { map } = state;
+  const out = [];
+  for (const [dx, dy] of DIRS) {
+    const n = tileAt(map, tileX(map, t) + dx, tileY(map, t) + dy);
+    if (n >= 0 && hasTrack(state, t, n)) out.push(n);
+  }
+  return out;
+}
+
+function tileHasTrack(state, t) {
+  return trackNeighbors(state, t).length > 0;
+}
+
+function segmentLength(map, a, b) {
+  return tileX(map, a) !== tileX(map, b) && tileY(map, a) !== tileY(map, b) ? Math.SQRT2 : 1;
+}
+
+// Dollar cost of laying one new piece of track from a to b. Infinity if blocked.
+function segmentCost(state, a, b) {
+  const { map } = state;
+  if (map.industry[a] >= 0 || map.industry[b] >= 0) return Infinity;
+  const terrain = (TERRAIN[map.terrain[a]].cost + TERRAIN[map.terrain[b]].cost) / 2;
+  const town = map.town[a] >= 0 || map.town[b] >= 0 ? TOWN_TILE_COST : 1;
+  return Math.round(COSTS.trackPerTile * terrain * town * segmentLength(map, a, b));
+}
+
+// Tiny binary heap keyed on .f for the searches below.
+function heapPush(heap, node) {
+  heap.push(node);
+  let i = heap.length - 1;
+  while (i > 0) {
+    const p = (i - 1) >> 1;
+    if (heap[p].f <= heap[i].f) break;
+    [heap[p], heap[i]] = [heap[i], heap[p]];
+    i = p;
+  }
+}
+
+function heapPop(heap) {
+  const top = heap[0];
+  const last = heap.pop();
+  if (heap.length) {
+    heap[0] = last;
+    let i = 0;
+    for (;;) {
+      const l = i * 2 + 1;
+      const r = l + 1;
+      let m = i;
+      if (l < heap.length && heap[l].f < heap[m].f) m = l;
+      if (r < heap.length && heap[r].f < heap[m].f) m = r;
+      if (m === i) break;
+      [heap[m], heap[i]] = [heap[i], heap[m]];
+      i = m;
+    }
+  }
+  return top;
+}
+
+function walkBack(prev, end) {
+  const path = [end];
+  while (prev.has(path[0])) path.unshift(prev.get(path[0]));
+  return path;
+}
+
+// Cheapest way to lay track between two tiles, reusing track already there.
+// Returns { path, cost } or null when there is no way through.
+function planTrack(state, from, to) {
+  const { map } = state;
+  if (from === to || from < 0 || to < 0) return null;
+  if (map.industry[from] >= 0 || map.industry[to] >= 0) return null;
+  const ax = tileX(map, from);
+  const ay = tileY(map, from);
+  const lx = tileX(map, to) - ax;
+  const ly = tileY(map, to) - ay;
+  const llen = Math.hypot(lx, ly) || 1;
+  // Small pull toward the straight line keeps the planner from zig-zagging over
+  // equally priced ground.
+  const offLine = (t) => Math.abs((tileX(map, t) - ax) * ly - (tileY(map, t) - ay) * lx) / llen;
+
+  const best = new Map([[from, 0]]);
+  const prev = new Map();
+  const heap = [{ t: from, g: 0, f: 0 }];
+  while (heap.length) {
+    const { t, g } = heapPop(heap);
+    if (t === to) {
+      const path = walkBack(prev, to);
+      let cost = 0;
+      for (let i = 1; i < path.length; i++) {
+        if (!hasTrack(state, path[i - 1], path[i])) cost += segmentCost(state, path[i - 1], path[i]);
+      }
+      return { path, cost };
+    }
+    if (g > best.get(t)) continue;
+    for (const [dx, dy] of DIRS) {
+      const n = tileAt(map, tileX(map, t) + dx, tileY(map, t) + dy);
+      if (n < 0) continue;
+      const step = hasTrack(state, t, n)
+        ? COSTS.trackPerTile * 0.05
+        : segmentCost(state, t, n) + COSTS.trackPerTile * 0.04 * offLine(n);
+      if (step === Infinity) continue;
+      const ng = g + step;
+      if (ng < (best.get(n) ?? Infinity)) {
+        best.set(n, ng);
+        prev.set(n, t);
+        heapPush(heap, { t: n, g: ng, f: ng });
+      }
+    }
+  }
+  return null;
+}
+
+// Shortest route along existing track. Returns a list of tiles or null.
+function findRoute(state, from, to) {
+  const { map } = state;
+  if (from === to) return [from];
+  const best = new Map([[from, 0]]);
+  const prev = new Map();
+  const heap = [{ t: from, f: 0 }];
+  while (heap.length) {
+    const { t, f } = heapPop(heap);
+    if (t === to) return walkBack(prev, to);
+    if (f > best.get(t)) continue;
+    for (const n of trackNeighbors(state, t)) {
+      const nf = f + segmentLength(map, t, n);
+      if (nf < (best.get(n) ?? Infinity)) {
+        best.set(n, nf);
+        prev.set(n, t);
+        heapPush(heap, { t: n, f: nf });
+      }
+    }
+  }
+  return null;
+}
+
+function pathLength(map, path) {
+  let len = 0;
+  for (let i = 1; i < path.length; i++) len += segmentLength(map, path[i - 1], path[i]);
+  return len;
+}
+
+// ---- src/core/economy.js ----
+// Money, dates, station catchments and cargo payments.
+
+
+
+
+function gameDay(state) {
+  return Math.floor(state.tick / TICKS_PER_DAY);
+}
+
+function gameDate(state) {
+  const day = gameDay(state);
+  const month = Math.floor(day / DAYS_PER_MONTH);
+  return { year: START_YEAR + Math.floor(month / 12), month: month % 12, day: (day % DAYS_PER_MONTH) + 1 };
+}
+
+function formatDate(state) {
+  const d = gameDate(state);
+  return `${MONTH_NAMES[d.month]} ${d.day}, ${d.year}`;
+}
+
+function spend(company, amount, category) {
+  company.cash -= amount;
+  company.month[category] += amount;
+  company.year[category] += amount;
+}
+
+// Money back from selling or bulldozing counts against that spending category.
+function refund(company, amount, category) {
+  spend(company, -amount, category);
+}
+
+function earn(company, amount) {
+  company.cash += amount;
+  company.month.revenue += amount;
+  company.year.revenue += amount;
+}
+
+function addMessage(state, text, kind = 'info') {
+  state.messages.unshift({ day: gameDay(state), text, kind });
+  if (state.messages.length > 40) state.messages.length = 40;
+}
+
+// Which towns and industries a station at tile t would serve.
+function catchmentAt(state, t) {
+  const { map } = state;
+  const towns = new Map(); // town id -> house tiles covered
+  const industries = new Set();
+  for (const i of tilesAround(map, t, CATCHMENT)) {
+    if (map.town[i] >= 0) towns.set(map.town[i], (towns.get(map.town[i]) || 0) + 1);
+    if (map.industry[i] >= 0) industries.add(map.industry[i]);
+  }
+  return {
+    towns: [...towns].map(([id, houses]) => ({ id, houses })),
+    industries: [...industries],
+  };
+}
+
+function catchmentCargo(state, catchment) {
+  const supplies = new Set();
+  const accepts = new Set();
+  if (catchment.towns.length) {
+    supplies.add('passengers');
+    supplies.add('mail');
+    for (const c of TOWN_ACCEPTS) accepts.add(c);
+  }
+  for (const id of catchment.industries) {
+    const type = INDUSTRY_TYPES[state.industries[id].type];
+    for (const c of type.produces) supplies.add(c);
+    for (const c of type.accepts) accepts.add(c);
+  }
+  return { supplies: [...supplies], accepts: [...accepts] };
+}
+
+function stationAccepts(state, station, cargo) {
+  return catchmentCargo(state, station.catchment).accepts.includes(cargo);
+}
+
+// What a delivery earns: rate x units x distance, shrinking the longer it took.
+function deliveryPay(state, cargo, amount, fromStation, toStation, days) {
+  const info = CARGO[cargo];
+  const dist = tileDist(state.map, fromStation.tile, toStation.tile);
+  const speed = Math.max(0.3, 1 - days / (info.decayDays * 2));
+  return Math.round(amount * info.rate * dist * speed);
+}
+
+function money(n) {
+  const sign = n < 0 ? '-' : '';
+  return `${sign}$${Math.abs(Math.round(n)).toLocaleString('en-US')}`;
+}
+
+// ---- src/core/commands.js ----
+// Every change a player (or, later, an AI rival or a network peer) makes to the
+// world goes through dispatch(). Commands are plain JSON, checked before they run,
+// and logged, which is what makes saves, replays, undo and multiplayer possible.
+
+
+
+
+
+
+const ok = (extra = {}) => ({ ok: true, ...extra });
+const fail = (error) => ({ ok: false, error });
+
+function stationAt(state, tile) {
+  return state.stations.find((s) => s.tile === tile);
+}
+
+function nearestTownName(state, tile) {
+  const x = tileX(state.map, tile);
+  const y = tileY(state.map, tile);
+  let best = state.towns[0];
+  for (const t of state.towns) {
+    if (Math.hypot(t.x - x, t.y - y) < Math.hypot(best.x - x, best.y - y)) best = t;
+  }
+  return best.name;
+}
+
+function trainCost(locoId, carCount) {
+  const loco = LOCOS.find((l) => l.id === locoId);
+  return loco ? loco.price + carCount * CAR.price : 0;
+}
+
+const HANDLERS = {
+  buildTrack(state, company, { from, to }) {
+    const plan = planTrack(state, from, to);
+    if (!plan) return fail('Track cannot reach there. Industries block the way.');
+    if (plan.cost === 0) return fail('That track is already built.');
+    if (plan.cost > company.cash) return fail(`Not enough cash. That track costs ${money(plan.cost)}.`);
+    for (let i = 1; i < plan.path.length; i++) {
+      const key = edgeKey(plan.path[i - 1], plan.path[i]);
+      if (state.track[key] === undefined) state.track[key] = company.id;
+    }
+    spend(company, plan.cost, 'construction');
+    return ok({ cost: plan.cost, path: plan.path });
+  },
+
+  buildStation(state, company, { tile }) {
+    if (!tileHasTrack(state, tile)) return fail('Stations go on a tile that already has track.');
+    if (stationAt(state, tile)) return fail('There is already a station here.');
+    if (state.stations.some((s) => Math.max(Math.abs(s.x - tileX(state.map, tile)), Math.abs(s.y - tileY(state.map, tile))) < 3)) {
+      return fail('Too close to another station. Leave at least two tiles between them.');
+    }
+    if (COSTS.station > company.cash) return fail(`Not enough cash. A station costs ${money(COSTS.station)}.`);
+    const town = nearestTownName(state, tile);
+    const taken = state.stations.filter((s) => s.name.startsWith(town)).length;
+    const station = {
+      id: state.nextId++,
+      owner: company.id,
+      name: taken ? `${town} ${['East', 'West', 'North', 'South', 'Junction'][taken - 1] || taken + 1}` : town,
+      tile,
+      x: tileX(state.map, tile),
+      y: tileY(state.map, tile),
+      catchment: catchmentAt(state, tile),
+      waiting: {},
+    };
+    state.stations.push(station);
+    spend(company, COSTS.station, 'construction');
+    return ok({ station });
+  },
+
+  bulldoze(state, company, { tile }) {
+    const station = stationAt(state, tile);
+    if (station) {
+      if (station.owner !== company.id) return fail('That station belongs to someone else.');
+      state.stations = state.stations.filter((s) => s !== station);
+      for (const train of state.trains) {
+        train.stops = train.stops.filter((id) => id !== station.id);
+        train.stopIndex = Math.min(train.stopIndex, Math.max(0, train.stops.length - 1));
+        train.reroute = true;
+      }
+      refund(company, COSTS.station * COSTS.refund, 'construction');
+      return ok({ removed: 'station' });
+    }
+    const pieces = trackNeighbors(state, tile).filter((n) => state.track[edgeKey(tile, n)] === company.id);
+    if (!pieces.length) return fail('Nothing of yours to bulldoze here.');
+    let back = 0;
+    for (const n of pieces) {
+      back += segmentCost(state, tile, n) * COSTS.refund;
+      delete state.track[edgeKey(tile, n)];
+    }
+    back = Math.round(back);
+    refund(company, back, 'construction');
+    for (const train of state.trains) train.reroute = true;
+    return ok({ removed: 'track', refund: back });
+  },
+
+  buyTrain(state, company, { loco: locoId, cars, stops }) {
+    const loco = LOCOS.find((l) => l.id === locoId);
+    if (!loco) return fail('Pick a locomotive.');
+    if (!Array.isArray(stops) || stops.length < 2) return fail('A train needs at least two stops.');
+    const stations = stops.map((id) => state.stations.find((s) => s.id === id));
+    if (stations.some((s) => !s)) return fail('One of the stops no longer exists.');
+    for (let i = 0; i < stops.length; i++) {
+      if (stops[i] === stops[(i + 1) % stops.length]) return fail('Two stops in a row are the same station.');
+    }
+    if (!Array.isArray(cars) || cars.length < 1) return fail('Add at least one car.');
+    if (cars.length > loco.maxCars) return fail(`The ${loco.name} pulls at most ${loco.maxCars} cars.`);
+    if (cars.some((c) => !CARGO[c])) return fail('Unknown car type.');
+    const price = trainCost(locoId, cars.length);
+    if (price > company.cash) return fail(`Not enough cash. This train costs ${money(price)}.`);
+    const num = state.trains.filter((t) => t.owner === company.id).length + 1;
+    const train = {
+      id: state.nextId++,
+      owner: company.id,
+      name: `Train ${num}`,
+      loco: locoId,
+      cars: cars.map((cargo) => ({ cargo, amount: 0, origin: null, loadedDay: 0 })),
+      stops: stops.slice(),
+      stopIndex: 0,
+      tile: stations[0].tile,
+      path: [stations[0].tile],
+      seg: 0,
+      segT: 0,
+      status: 'loading',
+      wait: LOAD_DAYS * TICKS_PER_DAY,
+      arrived: false,
+      reroute: false,
+      price,
+      profitYear: 0,
+      profitLastYear: null,
+      profitTotal: 0,
+    };
+    state.trains.push(train);
+    spend(company, price, 'trains');
+    addMessage(state, `${train.name} (${loco.name}) bought for ${money(price)}.`);
+    return ok({ train });
+  },
+
+  sellTrain(state, company, { trainId }) {
+    const train = state.trains.find((t) => t.id === trainId);
+    if (!train || train.owner !== company.id) return fail('That train is not yours.');
+    const back = Math.round(train.price * COSTS.trainResale);
+    state.trains = state.trains.filter((t) => t !== train);
+    refund(company, back, 'trains');
+    addMessage(state, `${train.name} sold for ${money(back)}.`);
+    return ok({ refund: back });
+  },
+
+  renameCompany(state, company, { name }) {
+    const clean = String(name || '').trim().slice(0, 40);
+    if (!clean) return fail('Give the company a name.');
+    company.name = clean;
+    return ok();
+  },
+};
+
+function dispatch(state, cmd) {
+  const handler = HANDLERS[cmd.type];
+  if (!handler) return fail(`Unknown command ${cmd.type}`);
+  const company = state.companies[cmd.company ?? 0];
+  if (!company) return fail('Unknown company.');
+  if (state.outcome === 'bankrupt') return fail('The company is bankrupt.');
+  const result = handler(state, company, cmd);
+  if (result.ok) state.commandLog.push({ tick: state.tick, ...cmd });
+  return result;
+}
+
+// ---- src/core/sim.js ----
+// The clock. step() advances the world by one tick: trains move every tick,
+// industries and towns produce every day, and the books close every month.
+
+
+
+
+
+
+
+function locoOf(train) {
+  return LOCOS.find((l) => l.id === train.loco);
+}
+
+// Tiles per tick. Each car adds drag.
+function trainSpeed(train) {
+  return (locoOf(train).speed * Math.max(0.55, 1 - 0.035 * train.cars.length)) / TICKS_PER_DAY;
+}
+
+function stationById(state, id) {
+  return state.stations.find((s) => s.id === id);
+}
+
+function routeStations(state, train) {
+  return train.stops.map((id) => stationById(state, id)).filter(Boolean);
+}
+
+function startLeg(state, train) {
+  const dest = stationById(state, train.stops[train.stopIndex]);
+  if (!dest) {
+    train.status = 'noOrders';
+    return;
+  }
+  const route = findRoute(state, train.tile, dest.tile);
+  if (!route) {
+    train.status = 'lost';
+    return;
+  }
+  // Keep a few tiles of where the train came from so its cars still trail
+  // behind the locomotive as it pulls out.
+  const tail = train.path[train.path.length - 1] === route[0] ? train.path.slice(-7, -1) : [];
+  train.path = [...tail, ...route];
+  train.seg = tail.length;
+  train.segT = 0;
+  train.status = 'moving';
+  if (route.length === 1) arrive(state, train);
+}
+
+function loadCars(state, train, station) {
+  const others = routeStations(state, train).filter((s) => s.id !== station.id);
+  const day = gameDay(state);
+  for (const car of train.cars) {
+    if (car.amount > 0 && car.origin !== station.id) continue;
+    if (car.amount >= CAR.capacity) continue;
+    // Only pick up cargo that some other stop on the route will take.
+    if (!others.some((s) => stationAccepts(state, s, car.cargo))) continue;
+    const waiting = Math.floor(station.waiting[car.cargo] || 0);
+    const take = Math.min(CAR.capacity - car.amount, waiting);
+    if (take <= 0) continue;
+    station.waiting[car.cargo] -= take;
+    if (car.amount === 0) car.loadedDay = day;
+    car.amount += take;
+    car.origin = station.id;
+  }
+}
+
+function feedIndustry(state, station, cargo, amount) {
+  for (const id of station.catchment.industries) {
+    const ind = state.industries[id];
+    const type = INDUSTRY_TYPES[ind.type];
+    if (type.converts && type.converts[cargo]) {
+      ind.stock[cargo] = (ind.stock[cargo] || 0) + amount;
+      return;
+    }
+  }
+}
+
+function arrive(state, train) {
+  const station = stationById(state, train.stops[train.stopIndex]);
+  train.status = 'loading';
+  train.wait = LOAD_DAYS * TICKS_PER_DAY;
+  if (!station) return;
+  const company = state.companies[train.owner];
+  const day = gameDay(state);
+  let total = 0;
+  const units = {};
+  for (const car of train.cars) {
+    if (car.amount <= 0 || car.origin === station.id) continue;
+    if (!stationAccepts(state, station, car.cargo)) continue;
+    const origin = stationById(state, car.origin);
+    const pay = origin ? deliveryPay(state, car.cargo, car.amount, origin, station, day - car.loadedDay) : 0;
+    total += pay;
+    units[car.cargo] = (units[car.cargo] || 0) + car.amount;
+    feedIndustry(state, station, car.cargo, car.amount);
+    car.amount = 0;
+    car.origin = null;
+  }
+  if (total > 0) {
+    earn(company, total);
+    train.profitYear += total;
+    train.profitTotal += total;
+    state.events.push({ type: 'cash', tile: station.tile, amount: total });
+    const parts = Object.entries(units).map(([c, n]) => `${n} ${CARGO[c].name.toLowerCase()}`);
+    addMessage(state, `${train.name} delivered ${parts.join(', ')} to ${station.name} for ${money(total)}.`, 'cash');
+  }
+  loadCars(state, train, station);
+}
+
+function followReroute(state, train) {
+  train.reroute = false;
+  if (train.status !== 'moving') return;
+  const dest = stationById(state, train.stops[train.stopIndex]);
+  const a = train.path[train.seg];
+  const b = train.path[train.seg + 1];
+  if (dest && b !== undefined && train.segT > 0 && hasTrack(state, a, b)) {
+    const ahead = findRoute(state, b, dest.tile);
+    if (ahead) {
+      train.path = [a, ...ahead];
+      train.seg = 0;
+      return;
+    }
+  }
+  train.tile = a;
+  train.segT = 0;
+  startLeg(state, train);
+}
+
+function moveTrain(state, train) {
+  const { map } = state;
+  let d = trainSpeed(train);
+  while (d > 0) {
+    const a = train.path[train.seg];
+    const b = train.path[train.seg + 1];
+    if (b === undefined) {
+      arrive(state, train);
+      return;
+    }
+    if (train.segT === 0 && !hasTrack(state, a, b)) {
+      train.reroute = true;
+      followReroute(state, train);
+      return;
+    }
+    const len = segmentLength(map, a, b);
+    const left = (1 - train.segT) * len;
+    if (d >= left) {
+      d -= left;
+      train.seg++;
+      train.segT = 0;
+      train.tile = train.path[train.seg];
+    } else {
+      train.segT += d / len;
+      d = 0;
+    }
+  }
+  if (train.seg >= train.path.length - 1) arrive(state, train);
+}
+
+function updateTrain(state, train) {
+  if (train.stops.length < 2) {
+    train.status = 'noOrders';
+    return;
+  }
+  if (train.reroute) followReroute(state, train);
+  if (train.status === 'noOrders') startLeg(state, train);
+  if (train.status === 'loading') {
+    train.wait--;
+    if (train.wait % TICKS_PER_DAY === 0) {
+      const station = stationById(state, train.stops[train.stopIndex]);
+      if (station) loadCars(state, train, station);
+    }
+    if (train.wait > 0) return;
+    train.stopIndex = (train.stopIndex + 1) % train.stops.length;
+    startLeg(state, train);
+    return;
+  }
+  if (train.status === 'lost') {
+    if (state.tick % TICKS_PER_DAY === 0) startLeg(state, train);
+    return;
+  }
+  if (train.status === 'moving') moveTrain(state, train);
+}
+
+function supply(state, cargo, amount, targets) {
+  const weight = targets.reduce((sum, t) => sum + t.weight, 0);
+  if (!weight || amount <= 0) return 0;
+  for (const { station, weight: w } of targets) {
+    station.waiting[cargo] = Math.min(STATION_CAP, (station.waiting[cargo] || 0) + (amount * w) / weight);
+  }
+  return amount;
+}
+
+function produceDaily(state) {
+  for (const ind of state.industries) {
+    const type = INDUSTRY_TYPES[ind.type];
+    let amount = 0;
+    if (type.converts) {
+      for (const [input, output] of Object.entries(type.converts)) {
+        if (output !== type.produces[0]) continue;
+        amount += ind.stock[input] || 0;
+        ind.stock[input] = 0;
+      }
+    } else {
+      amount = (type.base / DAYS_PER_MONTH) * (0.7 + rngNext(state) * 0.6);
+    }
+    const targets = state.stations
+      .filter((s) => s.catchment.industries.includes(ind.id))
+      .map((station) => ({ station, weight: 1 }));
+    ind.producedMonth = (ind.producedMonth || 0) + amount;
+    ind.shippedMonth = (ind.shippedMonth || 0) + supply(state, type.produces[0], amount, targets);
+  }
+  for (const town of state.towns) {
+    const targets = [];
+    for (const station of state.stations) {
+      const hit = station.catchment.towns.find((t) => t.id === town.id);
+      if (hit) targets.push({ station, weight: hit.houses });
+    }
+    const f = 0.8 + rngNext(state) * 0.4;
+    supply(state, 'passengers', ((town.pop / 30) * f) / DAYS_PER_MONTH, targets);
+    supply(state, 'mail', ((town.pop / 100) * f) / DAYS_PER_MONTH, targets);
+  }
+}
+
+function closeMonth(state) {
+  const date = gameDate(state); // already the first day of the new month
+  const endedMonth = (date.month + 11) % 12;
+  const endedYear = date.month === 0 ? date.year - 1 : date.year;
+
+  for (const ind of state.industries) {
+    ind.lastProduced = Math.round(ind.producedMonth || 0);
+    ind.lastShipped = Math.round(ind.shippedMonth || 0);
+    ind.producedMonth = 0;
+    ind.shippedMonth = 0;
+  }
+  for (const station of state.stations) {
+    for (const c of Object.keys(station.waiting)) station.waiting[c] *= STATION_SPOIL;
+  }
+  for (const company of state.companies) {
+    let upkeep = 0;
+    for (const train of state.trains.filter((t) => t.owner === company.id)) {
+      const cost = (locoOf(train).upkeep + train.cars.length * CAR.upkeep) / 12;
+      upkeep += cost;
+      train.profitYear -= cost;
+      train.profitTotal -= cost;
+    }
+    spend(company, Math.round(upkeep), 'upkeep');
+    const m = company.month;
+    company.history.push({
+      label: `${MONTH_NAMES[endedMonth]} ${endedYear}`,
+      revenue: m.revenue,
+      expenses: m.construction + m.trains + m.upkeep,
+      cash: company.cash,
+    });
+    if (company.history.length > 24) company.history.shift();
+    company.month = emptyLedger();
+    if (date.month === 0) {
+      company.lastYear = company.year;
+      company.year = emptyLedger();
+    }
+  }
+  if (date.month === 0) {
+    for (const train of state.trains) {
+      train.profitLastYear = train.profitYear;
+      train.profitYear = 0;
+    }
+  }
+  const player = state.companies[0];
+  if (!state.outcome) {
+    if (player.cash >= GOAL_CASH) state.outcome = 'won';
+    else if (date.year >= GOAL_YEAR) state.outcome = 'timeUp';
+    if (state.outcome) state.events.push({ type: 'outcome', outcome: state.outcome });
+  }
+}
+
+function step(state) {
+  state.tick++;
+  for (const train of state.trains) updateTrain(state, train);
+  if (state.tick % TICKS_PER_DAY === 0) {
+    produceDaily(state);
+    if (gameDay(state) % DAYS_PER_MONTH === 0) closeMonth(state);
+  }
+}
+
+// ---- src/ui/render.js ----
+// Draws the map on a canvas. Placeholder art: flat colour tiles, simple shapes
+// for buildings and trains. Terrain, towns and industries never change during a
+// game, so they are painted once into an offscreen canvas.
+
+
+
+
+
+const TILE = 32;
+
+const PAINT = {
+  grass: ['#8da768', '#93ad6c', '#88a163'],
+  forestFloor: '#7b9659',
+  tree: ['#3f6232', '#4a6f38', '#365a2d'],
+  hill: ['#b4a172', '#ab9869', '#bba879'],
+  hillLine: '#8f7d52',
+  water: '#4d7f9f',
+  ripple: '#6e9cb9',
+  roofs: ['#9b4a36', '#7d5a45', '#a8613d', '#6f6255'],
+  wall: '#e3d6bd',
+  yard: '#a39a80',
+  tie: '#5c3f27',
+  rail: '#2a2a2a',
+  label: '#fffaf0',
+  halo: '#1a1f1d',
+};
+
+function hash(x, y) {
+  const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+function tileCenter(map, t) {
+  return [(tileX(map, t) + 0.5) * TILE, (tileY(map, t) + 0.5) * TILE];
+}
+
+function paintTile(g, state, t) {
+  const { map } = state;
+  const x = tileX(map, t);
+  const y = tileY(map, t);
+  const px = x * TILE;
+  const py = y * TILE;
+  const r = hash(x, y);
+  const type = map.terrain[t];
+  if (type === WATER) {
+    g.fillStyle = PAINT.water;
+    g.fillRect(px, py, TILE, TILE);
+    g.strokeStyle = PAINT.ripple;
+    g.lineWidth = 1.5;
+    g.beginPath();
+    const ry = py + 8 + r * 16;
+    g.moveTo(px + 6, ry);
+    g.quadraticCurveTo(px + 12, ry - 3, px + 18, ry);
+    g.stroke();
+    return;
+  }
+  if (type === HILL) {
+    g.fillStyle = PAINT.hill[Math.floor(r * 3)];
+    g.fillRect(px, py, TILE, TILE);
+    g.strokeStyle = PAINT.hillLine;
+    g.lineWidth = 1.5;
+    g.beginPath();
+    g.arc(px + 16, py + 26, 10 + r * 4, Math.PI * 1.15, Math.PI * 1.85);
+    g.stroke();
+    return;
+  }
+  g.fillStyle = type === FOREST ? PAINT.forestFloor : PAINT.grass[Math.floor(r * 3)];
+  g.fillRect(px, py, TILE, TILE);
+  if (type === FOREST && map.town[t] < 0) {
+    for (let i = 0; i < 3; i++) {
+      const tx = px + 7 + hash(x + i, y) * 18;
+      const ty = py + 7 + hash(x, y + i) * 18;
+      g.fillStyle = PAINT.tree[i];
+      g.beginPath();
+      g.arc(tx, ty, 6, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  if (type === GRASS && r > 0.86) {
+    g.fillStyle = '#7f9a5c';
+    g.fillRect(px + r * 20, py + hash(y, x) * 20, 3, 3);
+  }
+}
+
+function paintHouses(g, state, t) {
+  const { map } = state;
+  const x = tileX(map, t);
+  const y = tileY(map, t);
+  const n = 2 + Math.floor(hash(x * 3, y) * 2);
+  for (let i = 0; i < n; i++) {
+    const hx = x * TILE + 3 + hash(x + i * 7, y) * 17;
+    const hy = y * TILE + 3 + hash(x, y + i * 5) * 17;
+    g.fillStyle = PAINT.wall;
+    g.fillRect(hx, hy + 4, 11, 8);
+    g.fillStyle = PAINT.roofs[Math.floor(hash(hx, hy) * 4)];
+    g.fillRect(hx - 1, hy, 13, 6);
+  }
+}
+
+function paintIndustry(g, state, ind) {
+  const type = INDUSTRY_TYPES[ind.type];
+  const px = ind.x * TILE;
+  const py = ind.y * TILE;
+  const s = TILE * 2;
+  g.fillStyle = PAINT.yard;
+  g.fillRect(px + 2, py + 2, s - 4, s - 4);
+  g.strokeStyle = '#6d6553';
+  g.lineWidth = 2;
+  g.strokeRect(px + 2, py + 2, s - 4, s - 4);
+  g.fillStyle = type.color;
+  if (ind.type === 'coalMine') {
+    g.beginPath();
+    g.moveTo(px + 8, py + s - 10);
+    g.lineTo(px + 26, py + 14);
+    g.lineTo(px + 44, py + s - 10);
+    g.fill();
+    g.fillRect(px + 40, py + 18, 16, 22);
+  } else if (ind.type === 'loggingCamp') {
+    for (let i = 0; i < 4; i++) {
+      g.fillStyle = i % 2 ? '#8a5a32' : '#a06a3a';
+      g.fillRect(px + 8, py + 34 + i * 5, 30, 4);
+    }
+    g.fillStyle = type.color;
+    g.fillRect(px + 38, py + 12, 18, 16);
+  } else if (ind.type === 'farm') {
+    g.fillStyle = '#d8bc58';
+    g.fillRect(px + 6, py + 30, 52, 26);
+    g.strokeStyle = '#b39535';
+    for (let i = 0; i < 5; i++) {
+      g.beginPath();
+      g.moveTo(px + 6, py + 34 + i * 5);
+      g.lineTo(px + 58, py + 34 + i * 5);
+      g.stroke();
+    }
+    g.fillStyle = '#9b3b2c';
+    g.fillRect(px + 12, py + 10, 20, 16);
+    g.fillStyle = '#d9d0bd';
+    g.fillRect(px + 38, py + 8, 10, 20);
+  } else {
+    g.fillRect(px + 8, py + 22, 48, 32);
+    g.fillStyle = '#4a4f55';
+    g.fillRect(px + 14, py + 6, 7, 18);
+    g.fillRect(px + 28, py + 10, 7, 14);
+    g.fillStyle = '#d9d0bd55';
+    g.beginPath();
+    g.arc(px + 18, py + 4, 6, 0, Math.PI * 2);
+    g.fill();
+  }
+  // letter badge so each kind reads at a glance
+  g.fillStyle = '#1b1f1d';
+  g.beginPath();
+  g.arc(px + s - 12, py + 12, 9, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = '#fff3d6';
+  g.font = 'bold 12px sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(type.mark, px + s - 12, py + 12.5);
+}
+
+function buildTerrainCache(state) {
+  const { map } = state;
+  const canvas = document.createElement('canvas');
+  canvas.width = map.w * TILE;
+  canvas.height = map.h * TILE;
+  const g = canvas.getContext('2d');
+  for (let t = 0; t < map.w * map.h; t++) paintTile(g, state, t);
+  for (let t = 0; t < map.w * map.h; t++) if (map.town[t] >= 0) paintHouses(g, state, t);
+  for (const ind of state.industries) paintIndustry(g, state, ind);
+  return canvas;
+}
+
+// ---- per-frame drawing ----
+
+function parseTrack(state) {
+  const out = [];
+  for (const key of Object.keys(state.track)) {
+    const [a, b] = key.split('-').map(Number);
+    out.push([a, b, state.track[key]]);
+  }
+  return out;
+}
+
+function drawTrackPieces(ctx, state, view, pieces, style) {
+  const { map } = state;
+  const detailed = view.cam.zoom * TILE >= 18;
+  if (detailed && !style) {
+    ctx.strokeStyle = PAINT.tie;
+    ctx.lineWidth = 3;
+    for (const [a, b] of pieces) {
+      const [ax, ay] = tileCenter(map, a);
+      const [bx, by] = tileCenter(map, b);
+      const len = Math.hypot(bx - ax, by - ay);
+      const nx = -(by - ay) / len;
+      const ny = (bx - ax) / len;
+      const count = Math.round(len / 7);
+      ctx.beginPath();
+      for (let i = 0; i <= count; i++) {
+        const cx = ax + ((bx - ax) * i) / count;
+        const cy = ay + ((by - ay) * i) / count;
+        ctx.moveTo(cx - nx * 7, cy - ny * 7);
+        ctx.lineTo(cx + nx * 7, cy + ny * 7);
+      }
+      ctx.stroke();
+    }
+    ctx.strokeStyle = PAINT.rail;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    for (const [a, b] of pieces) {
+      const [ax, ay] = tileCenter(map, a);
+      const [bx, by] = tileCenter(map, b);
+      const len = Math.hypot(bx - ax, by - ay);
+      const nx = (-(by - ay) / len) * 3.5;
+      const ny = ((bx - ax) / len) * 3.5;
+      ctx.moveTo(ax + nx, ay + ny);
+      ctx.lineTo(bx + nx, by + ny);
+      ctx.moveTo(ax - nx, ay - ny);
+      ctx.lineTo(bx - nx, by - ny);
+    }
+    ctx.stroke();
+    return;
+  }
+  ctx.strokeStyle = style || '#3a2c20';
+  ctx.lineWidth = style ? 6 : Math.max(2, 4 / view.cam.zoom);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (const [a, b] of pieces) {
+    const [ax, ay] = tileCenter(map, a);
+    const [bx, by] = tileCenter(map, b);
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+  }
+  ctx.stroke();
+  ctx.lineCap = 'butt';
+}
+
+function drawStations(ctx, state, view) {
+  const { map } = state;
+  for (const s of state.stations) {
+    const [cx, cy] = tileCenter(map, s.tile);
+    const color = state.companies[s.owner].color;
+    ctx.fillStyle = '#f4ead4';
+    ctx.strokeStyle = '#1b1f1d';
+    ctx.lineWidth = 2;
+    ctx.fillRect(cx - 13, cy - 9, 26, 18);
+    ctx.strokeRect(cx - 13, cy - 9, 26, 18);
+    ctx.fillStyle = color;
+    ctx.fillRect(cx - 13, cy - 9, 26, 7);
+    const sel = view.selected;
+    if (sel && sel.kind === 'station' && sel.id === s.id) {
+      ctx.strokeStyle = '#d6a740';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(cx - 17, cy - 13, 34, 26);
+    }
+  }
+}
+
+// Point a given distance behind the train's head, along its path.
+function pointBehind(map, train, back) {
+  const { path } = train;
+  if (path.length < 2) {
+    const [x, y] = tileCenter(map, path[0]);
+    return [x, y, 0];
+  }
+  let i = train.seg;
+  let along;
+  if (i >= path.length - 1) {
+    i = path.length - 2;
+    along = segmentLength(map, path[i], path[i + 1]) - back;
+  } else {
+    along = train.segT * segmentLength(map, path[i], path[i + 1]) - back;
+  }
+  while (along < 0 && i > 0) {
+    i--;
+    along += segmentLength(map, path[i], path[i + 1]);
+  }
+  const a = path[i];
+  const b = path[i + 1];
+  const f = Math.max(0, Math.min(1, along / segmentLength(map, a, b)));
+  const [ax, ay] = tileCenter(map, a);
+  const [bx, by] = tileCenter(map, b);
+  return [ax + (bx - ax) * f, ay + (by - ay) * f, Math.atan2(by - ay, bx - ax)];
+}
+
+function drawTrains(ctx, state, view) {
+  const { map } = state;
+  for (const train of state.trains) {
+    const color = state.companies[train.owner].color;
+    const selected = view.selected && view.selected.kind === 'train' && view.selected.id === train.id;
+    for (let i = train.cars.length; i >= 0; i--) {
+      const [x, y, ang] = pointBehind(map, train, i * 0.55);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(ang);
+      if (i === 0) {
+        ctx.fillStyle = '#1d1d1f';
+        ctx.fillRect(-8, -5.5, 16, 11);
+        ctx.fillStyle = color;
+        ctx.fillRect(-8, -5.5, 6, 11);
+        ctx.fillStyle = '#d6a740';
+        ctx.fillRect(5, -2, 3, 4);
+      } else {
+        const car = train.cars[i - 1];
+        ctx.fillStyle = '#3b3530';
+        ctx.fillRect(-7, -5, 14, 10);
+        if (car.amount > 0) {
+          ctx.fillStyle = CARGO[car.cargo].color;
+          ctx.fillRect(-5.5, -3.5, 11, 7);
+        } else {
+          ctx.strokeStyle = CARGO[car.cargo].color;
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(-5, -3, 10, 6);
+        }
+      }
+      if (selected && i === 0) {
+        ctx.strokeStyle = '#d6a740';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-10, -8, 20, 16);
+      }
+      ctx.restore();
+    }
+  }
+}
+
+function haloText(ctx, text, x, y, size, font, color = PAINT.label) {
+  ctx.font = `${size}px ${font}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = Math.max(2, size / 4);
+  ctx.strokeStyle = PAINT.halo;
+  ctx.lineJoin = 'round';
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
+}
+
+function drawLabels(ctx, state, view) {
+  const { map } = state;
+  const z = view.cam.zoom;
+  // Labels are drawn in screen space so they stay readable at any zoom.
+  const toScreen = (wx, wy) => [(wx - view.cam.x) * z + view.w / 2, (wy - view.cam.y) * z + view.h / 2];
+  for (const town of state.towns) {
+    const [sx, sy] = toScreen((town.x + 0.5) * TILE, (town.y - 1.2) * TILE);
+    haloText(ctx, town.name, sx, sy, 17, "'Rye', Georgia, serif");
+    if (z > 0.55) haloText(ctx, `pop. ${town.pop.toLocaleString('en-US')}`, sx, sy + 15, 12, "'Barlow Semi Condensed', sans-serif", '#e9e2cf');
+  }
+  if (z > 0.62) {
+    for (const ind of state.industries) {
+      const [sx, sy] = toScreen((ind.x + 1) * TILE, (ind.y + 2.35) * TILE);
+      haloText(ctx, INDUSTRY_TYPES[ind.type].name, sx, sy, 12, "'Barlow Semi Condensed', sans-serif");
+    }
+  }
+  for (const s of state.stations) {
+    const [sx, sy] = toScreen((s.x + 0.5) * TILE, (s.y + 1.05) * TILE);
+    haloText(ctx, s.name, sx, sy, 13, "'Barlow Semi Condensed', sans-serif", '#ffe3a3');
+  }
+}
+
+function drawOverlays(ctx, state, view) {
+  const { map } = state;
+  const hover = view.hoverTile;
+  if (view.tool === 'station' && hover >= 0) {
+    const x = tileX(map, hover);
+    const y = tileY(map, hover);
+    const ok = view.stationCheck && view.stationCheck.ok;
+    ctx.fillStyle = ok ? '#d6a74033' : '#ec756333';
+    ctx.strokeStyle = ok ? '#d6a740' : '#ec7563';
+    ctx.lineWidth = 2;
+    const r = CATCHMENT;
+    ctx.fillRect((x - r) * TILE, (y - r) * TILE, (2 * r + 1) * TILE, (2 * r + 1) * TILE);
+    ctx.setLineDash([6, 5]);
+    ctx.strokeRect((x - r) * TILE, (y - r) * TILE, (2 * r + 1) * TILE, (2 * r + 1) * TILE);
+    ctx.setLineDash([]);
+  }
+  if (view.tool === 'track' && view.preview) {
+    const pieces = [];
+    for (let i = 1; i < view.preview.path.length; i++) pieces.push([view.preview.path[i - 1], view.preview.path[i]]);
+    drawTrackPieces(ctx, state, view, pieces, view.preview.affordable ? '#d6a740cc' : '#ec7563cc');
+  }
+  if (view.tool === 'track' && view.trackStart >= 0) {
+    const [cx, cy] = tileCenter(map, view.trackStart);
+    ctx.fillStyle = '#d6a740';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (hover >= 0) {
+    ctx.strokeStyle = view.tool === 'bulldoze' ? '#ec7563' : '#fff8e6';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(tileX(map, hover) * TILE + 1, tileY(map, hover) * TILE + 1, TILE - 2, TILE - 2);
+  }
+  const sel = view.selected;
+  if (sel && sel.kind === 'industry') {
+    const ind = state.industries[sel.id];
+    ctx.strokeStyle = '#d6a740';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(ind.x * TILE - 2, ind.y * TILE - 2, TILE * 2 + 4, TILE * 2 + 4);
+  }
+}
+
+function drawFloats(ctx, state, view, now) {
+  const { map } = state;
+  const z = view.cam.zoom;
+  view.floats = view.floats.filter((f) => now - f.born < 1800);
+  for (const f of view.floats) {
+    const age = (now - f.born) / 1800;
+    const [wx, wy] = tileCenter(map, f.tile);
+    const sx = (wx - view.cam.x) * z + view.w / 2;
+    const sy = (wy - view.cam.y) * z + view.h / 2 - 18 - age * 36;
+    ctx.globalAlpha = 1 - age * age;
+    haloText(ctx, f.text, sx, sy, 16, "'Barlow Semi Condensed', sans-serif", '#9fe39f');
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawFrame(ctx, state, view, terrain, now) {
+  const { w, h, dpr, cam } = view;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#22302a';
+  ctx.fillRect(0, 0, w, h);
+  ctx.setTransform(dpr * cam.zoom, 0, 0, dpr * cam.zoom, dpr * (w / 2 - cam.x * cam.zoom), dpr * (h / 2 - cam.y * cam.zoom));
+  ctx.imageSmoothingEnabled = cam.zoom < 1;
+  ctx.drawImage(terrain, 0, 0);
+  if (!view.trackCache || view.trackDirty) {
+    view.trackCache = parseTrack(state);
+    view.trackDirty = false;
+  }
+  drawTrackPieces(ctx, state, view, view.trackCache);
+  drawOverlays(ctx, state, view);
+  drawStations(ctx, state, view);
+  drawTrains(ctx, state, view);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawLabels(ctx, state, view);
+  drawFloats(ctx, state, view, now);
+}
+
+function screenToTile(view, map, sx, sy) {
+  const wx = (sx - view.w / 2) / view.cam.zoom + view.cam.x;
+  const wy = (sy - view.h / 2) / view.cam.zoom + view.cam.y;
+  return tileAt(map, Math.floor(wx / TILE), Math.floor(wy / TILE));
+}
+
+// ---- src/ui/hud.js ----
+// Everything on screen that is not the map: the info panel, hints, the news
+// ticker and the dialogs. All game changes go through game.run(command).
+
+
+
+
+
+
+
+const $ = (id) => document.getElementById(id);
+
+function esc(text) {
+  return String(text).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+function chip(cargo) {
+  return `<span class="chip"><i style="background:${CARGO[cargo].color}"></i>${CARGO[cargo].name}</span>`;
+}
+
+function chips(list, empty = 'Nothing') {
+  return list.length ? `<div class="chips">${list.map(chip).join('')}</div>` : `<span class="muted small">${empty}</span>`;
+}
+
+function rows(pairs) {
+  return `<div class="rows">${pairs.map(([k, v, cls = '']) => `<span class="${cls.includes('total') ? 'total' : ''}">${k}</span><span class="v ${cls}">${v}</span>`).join('')}</div>`;
+}
+
+function section(label, body) {
+  return `<div><div class="section-label">${label}</div>${body}</div>`;
+}
+
+const STATUS_TEXT = {
+  moving: 'Running',
+  loading: 'At station',
+  lost: 'No route',
+  noOrders: 'No orders',
+};
+
+function trainLine(state, train) {
+  const stop = state.stations.find((s) => s.id === train.stops[train.stopIndex]);
+  const where = stop ? stop.name : 'nowhere';
+  if (train.status === 'moving') return `Heading to ${esc(where)}`;
+  if (train.status === 'loading') return `Loading at ${esc(where)}`;
+  if (train.status === 'lost') return `No track to ${esc(where)}. Connect it and the train will go.`;
+  return 'Needs at least two stops.';
+}
+
+function ledgerRows(ledger) {
+  const spent = ledger.construction + ledger.trains + ledger.upkeep;
+  const profit = ledger.revenue - ledger.upkeep;
+  return rows([
+    ['Cargo revenue', money(ledger.revenue), 'good'],
+    ['Train running costs', money(-ledger.upkeep), ledger.upkeep ? 'bad' : ''],
+    ['Operating profit', money(profit), `total ${profit >= 0 ? 'good' : 'bad'}`],
+    ['Building and buying', money(-(spent - ledger.upkeep)), ''],
+  ]);
+}
+
+// ---- panel views. Each returns { kind, title, live, actions }. "live" is redrawn
+// a few times a second; "actions" only when the selection changes.
+
+function companyView(game) {
+  const { state } = game;
+  const c = state.companies[0];
+  const date = gameDate(state);
+  const pct = Math.max(0, Math.min(100, (c.cash / GOAL_CASH) * 100));
+  const yearsLeft = GOAL_YEAR - date.year;
+  const goalNote = state.outcome === 'won'
+    ? 'Goal reached. Keep growing.'
+    : yearsLeft > 0 ? `${yearsLeft} year${yearsLeft === 1 ? '' : 's'} left, until Jan 1, ${GOAL_YEAR}` : 'Time is up. Play on as long as you like.';
+  const trains = state.trains.filter((t) => t.owner === 0);
+  const trainList = trains.length
+    ? `<div class="list">${trains.map((t) => `
+        <div class="list-row" data-select="train:${t.id}">
+          <span><strong>${esc(t.name)}</strong> <span class="pill ${t.status}">${STATUS_TEXT[t.status]}</span></span>
+          <span class="${t.profitYear >= 0 ? '' : 'muted'}">${money(t.profitYear)}</span>
+          <span class="sub">${trainLine(state, t)}</span>
+        </div>`).join('')}</div>`
+    : '<span class="muted small">No trains yet. Lay track between two places, add a station at each end, then buy a train.</span>';
+  const news = state.messages.slice(0, 5).map((m) => `<div class="${m.kind}">${esc(m.text)}</div>`).join('') || '<span class="muted small">Nothing yet.</span>';
+  return {
+    kind: 'Your railroad',
+    title: c.name,
+    live: [
+      section(`Goal: ${money(GOAL_CASH)} cash`, `<div class="goal-bar"><span style="width:${pct}%"></span></div><div class="small muted" style="margin-top:4px">${money(c.cash)} of ${money(GOAL_CASH)} · ${goalNote}</div>`),
+      section(`This year (${date.year})`, ledgerRows(c.year)),
+      c.lastYear ? section('Last year', rows([['Operating profit', money(c.lastYear.revenue - c.lastYear.upkeep), c.lastYear.revenue - c.lastYear.upkeep >= 0 ? 'good' : 'bad']])) : '',
+      section(`Trains (${trains.length}) · profit this year`, trainList),
+      section('Latest news', `<div class="news">${news}</div>`),
+    ].join(''),
+    actions: '<button type="button" class="btn primary" data-action="newTrain">Buy a train</button>',
+  };
+}
+
+function stationsServing(state, test) {
+  return state.stations.filter(test).map((s) => esc(s.name));
+}
+
+function townView(game, id) {
+  const { state } = game;
+  const town = state.towns[id];
+  const served = stationsServing(state, (s) => s.catchment.towns.some((t) => t.id === id));
+  return {
+    kind: 'Town',
+    title: town.name,
+    live: [
+      rows([
+        ['Population', town.pop.toLocaleString('en-US')],
+        ['Passengers each month', `about ${Math.round(town.pop / 30)}`],
+        ['Mail each month', `about ${Math.round(town.pop / 100)}`],
+      ]),
+      section('Wants', chips(TOWN_ACCEPTS)),
+      section('Your stations here', served.length ? served.join(', ') : '<span class="muted small">None. Build a station within two tiles of the houses.</span>'),
+    ].join(''),
+    actions: '',
+  };
+}
+
+function industryView(game, id) {
+  const { state } = game;
+  const ind = state.industries[id];
+  const type = INDUSTRY_TYPES[ind.type];
+  const served = stationsServing(state, (s) => s.catchment.industries.includes(id));
+  const share = ind.lastProduced ? Math.round((ind.lastShipped / ind.lastProduced) * 100) : 0;
+  const what = type.converts
+    ? `Turns ${Object.keys(type.converts).map((c) => CARGO[c].name.toLowerCase()).join(' and ')} into ${CARGO[type.produces[0]].name.toLowerCase()}. Deliver ${Object.keys(type.converts).map((c) => CARGO[c].name.toLowerCase()).join(' and ')} here to get ${CARGO[type.produces[0]].name.toLowerCase()} to sell on.`
+    : `Produces about ${type.base} ${CARGO[type.produces[0]].name.toLowerCase()} a month.`;
+  return {
+    kind: type.name,
+    title: ind.name,
+    live: [
+      `<p class="small" style="margin:0">${what}</p>`,
+      section('Makes', chips(type.produces)),
+      type.accepts.length ? section('Wants', chips(type.accepts)) : '',
+      section('Last month', rows([
+        ['Produced', `${ind.lastProduced || 0}`],
+        ['Picked up by your stations', `${share}%`],
+      ])),
+      section('Your stations here', served.length ? served.join(', ') : '<span class="muted small">None. Build a station within two tiles.</span>'),
+    ].join(''),
+    actions: '',
+  };
+}
+
+function stationView(game, id) {
+  const { state } = game;
+  const st = state.stations.find((s) => s.id === id);
+  if (!st) return null;
+  const cargo = catchmentCargo(state, st.catchment);
+  const waiting = CARGO_IDS.filter((c) => (st.waiting[c] || 0) >= 1);
+  const trains = state.trains.filter((t) => t.stops.includes(id));
+  return {
+    kind: 'Station',
+    title: st.name,
+    live: [
+      section('Waiting on the platform', waiting.length ? rows(waiting.map((c) => [CARGO[c].name, Math.floor(st.waiting[c])])) : '<span class="muted small">Nothing waiting yet.</span>'),
+      section('Picks up', chips(cargo.supplies, 'Nothing nearby to pick up')),
+      section('Delivers', chips(cargo.accepts, 'Nothing nearby wants cargo')),
+      section('Trains calling here', trains.length ? `<div class="list">${trains.map((t) => `<div class="list-row" data-select="train:${t.id}"><span>${esc(t.name)}</span><span class="pill ${t.status}">${STATUS_TEXT[t.status]}</span></div>`).join('')}</div>` : '<span class="muted small">None yet.</span>'),
+    ].join(''),
+    actions: `<button type="button" class="btn primary" data-action="newTrain" data-from="${id}">Buy a train from here</button>`,
+  };
+}
+
+function trainView(game, id) {
+  const { state } = game;
+  const train = state.trains.find((t) => t.id === id);
+  if (!train) return null;
+  const loco = locoOf(train);
+  const stops = train.stops.map((sid, i) => {
+    const st = state.stations.find((s) => s.id === sid);
+    const here = i === train.stopIndex;
+    return `<div class="${here ? '' : 'muted'}">${here ? '▸ ' : ''}${i + 1}. ${esc(st ? st.name : 'Removed station')}</div>`;
+  }).join('');
+  const cars = train.cars.map((car) => {
+    const fill = Math.round((car.amount / CAR.capacity) * 100);
+    return `<div class="car" title="${CARGO[car.cargo].name}: ${car.amount}/${CAR.capacity}" style="border-color:${CARGO[car.cargo].color}"><span style="width:${fill}%;background:${CARGO[car.cargo].color}"></span></div>`;
+  }).join('');
+  return {
+    kind: loco.name,
+    title: train.name,
+    live: [
+      `<div><span class="pill ${train.status}">${STATUS_TEXT[train.status]}</span> <span class="small">${trainLine(state, train)}</span></div>`,
+      section('Cars', `<div class="cars">${cars}</div><div class="small muted" style="margin-top:4px">${[...new Set(train.cars.map((c) => CARGO[c.cargo].name))].join(', ')}</div>`),
+      section('Route', `<div class="small">${stops}</div>`),
+      section('Profit', rows([
+        ['This year', money(train.profitYear), train.profitYear >= 0 ? 'good' : 'bad'],
+        ['Last year', train.profitLastYear === null ? '–' : money(train.profitLastYear)],
+        ['Since bought', money(train.profitTotal), train.profitTotal >= 0 ? 'good' : 'bad'],
+      ])),
+    ].join(''),
+    actions: `<button type="button" class="btn danger" data-action="sellTrain" data-id="${id}">Sell for ${money(train.price * COSTS.trainResale)}</button>`,
+  };
+}
+
+function viewFor(game) {
+  const sel = game.view.selected;
+  if (!sel) return companyView(game);
+  if (sel.kind === 'town') return townView(game, sel.id);
+  if (sel.kind === 'industry') return industryView(game, sel.id);
+  if (sel.kind === 'station') return stationView(game, sel.id) || companyView(game);
+  if (sel.kind === 'train') return trainView(game, sel.id) || companyView(game);
+  return companyView(game);
+}
+
+function renderPanel(game, full) {
+  const v = viewFor(game);
+  const close = game.view.selected ? '<button type="button" class="close" data-action="deselect" aria-label="Back to company">×</button>' : '';
+  if (full) {
+    $('panel-head').innerHTML = `${close}<div class="kind">${esc(v.kind)}</div><h2>${esc(v.title)}</h2>`;
+    $('panel-actions').innerHTML = v.actions;
+  }
+  if ($('panel-live').dataset.html !== v.live) {
+    $('panel-live').innerHTML = v.live;
+    $('panel-live').dataset.html = v.live;
+  }
+}
+
+function renderTopbar(game) {
+  const c = game.state.companies[0];
+  const cash = $('cash');
+  cash.textContent = money(c.cash);
+  cash.classList.toggle('negative', c.cash < 0);
+  $('date').textContent = formatDate(game.state);
+  $('company-name').textContent = c.name;
+}
+
+// ---- dialogs ----
+
+function openDialog(html, onClick) {
+  $('dialog').innerHTML = html;
+  $('modal').hidden = false;
+  $('dialog').onclick = onClick || null;
+  const first = $('dialog').querySelector('button.primary, button');
+  if (first) first.focus();
+}
+
+function closeDialog() {
+  $('modal').hidden = true;
+  $('dialog').innerHTML = '';
+  $('dialog').onclick = null;
+  $('dialog').onchange = null;
+}
+
+function helpHtml() {
+  return `
+    <h3>How to play</h3>
+    <ol class="steps">
+      <li><b>Lay track.</b> Pick <em>Lay track</em>, click where it starts, then click where it ends. You see the price before you build. Hills, forest, towns and rivers cost more.</li>
+      <li><b>Build a station</b> on your track, close to a town or an industry. The shaded square shows what the station reaches.</li>
+      <li><b>Buy a train.</b> Choose its stops and the kinds of cars it pulls.</li>
+      <li><b>Get paid on delivery.</b> A train earns money when it brings cargo to a station that wants it. Longer trips pay more; slow trips pay less.</li>
+    </ol>
+    <h3>What goes where</h3>
+    <p>Passengers and mail travel between towns. Coal goes to a steel mill, which makes steel that towns buy. Lumber goes to a sawmill, which makes goods that towns buy. Towns also buy grain from farms.</p>
+    <h3>Controls</h3>
+    <p>Drag the map to move it. Scroll or pinch to zoom. Keys 1 to 5 pick tools, Space pauses, Esc stops laying track.</p>`;
+}
+
+function welcomeDialog(game, hasSave) {
+  openDialog(`
+    <h1>Coin Express</h1>
+    <p class="lede">It is 1850. You run a small railroad company with ${money(COSTS.startCash)} in the bank. Connect towns and industries, haul their cargo, and build a fortune.</p>
+    <p><strong>Goal:</strong> have ${money(GOAL_CASH)} in cash before January ${GOAL_YEAR}.</p>
+    ${helpHtml()}
+    <div class="actions">
+      ${hasSave ? '<button type="button" class="btn" data-act="continue">Continue saved game</button>' : ''}
+      <button type="button" class="btn primary" data-act="new">Start a new railroad</button>
+    </div>`, (e) => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'continue') { closeDialog(); game.resume(); }
+    if (act === 'new') {
+      closeDialog();
+      if (hasSave) game.newGame();
+      else game.resume(); // the fresh map behind the dialog is already new
+    }
+  });
+}
+
+function helpDialog(game) {
+  openDialog(`<h2>How Coin Express works</h2>${helpHtml()}<div class="actions"><button type="button" class="btn primary" data-act="close">Back to the game</button></div>`, (e) => {
+    if (e.target.closest('[data-act="close"]')) { closeDialog(); game.resume(); }
+  });
+}
+
+function menuDialog(game) {
+  let confirming = false;
+  const draw = () => openDialog(`
+    <h2>Game</h2>
+    <p class="muted">Your game saves itself in this browser at the start of every month.</p>
+    <h3>Company name</h3>
+    <input class="name-input" id="company-input" maxlength="40" value="${esc(game.state.companies[0].name)}">
+    <h3>Map</h3>
+    <p class="small muted">Map number ${game.state.seed}. Every new railroad gets a fresh map.</p>
+    <div class="actions">
+      ${confirming
+        ? '<span class="warn">This throws away the current game.</span><button type="button" class="btn" data-act="cancel">Keep playing</button><button type="button" class="btn danger" data-act="reallyNew">Yes, start over</button>'
+        : '<button type="button" class="btn" data-act="new">Start a new railroad</button><button type="button" class="btn primary" data-act="close">Done</button>'}
+    </div>`, (e) => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (!act) return;
+    const name = document.getElementById('company-input')?.value;
+    if (name && name !== game.state.companies[0].name) game.run({ type: 'renameCompany', name });
+    if (act === 'close' || act === 'cancel') {
+      if (act === 'cancel') { confirming = false; draw(); return; }
+      closeDialog();
+      game.resume();
+    }
+    if (act === 'new') { confirming = true; draw(); }
+    if (act === 'reallyNew') { closeDialog(); game.newGame(); }
+  });
+  draw();
+}
+
+function outcomeDialog(game, outcome) {
+  const c = game.state.companies[0];
+  const won = outcome === 'won';
+  openDialog(`
+    <h1>${won ? 'A railroad fortune' : `January ${GOAL_YEAR}`}</h1>
+    <p class="lede">${won
+      ? `${esc(c.name)} reached ${money(GOAL_CASH)} on ${formatDate(game.state)}. The papers call you a rail baron.`
+      : `Time is up. ${esc(c.name)} has ${money(c.cash)}, short of the ${money(GOAL_CASH)} goal.`}</p>
+    <p>${won ? 'Keep playing to see how big it can grow, or start fresh on a new map.' : 'You can keep building on this map, or start fresh and try a different plan.'}</p>
+    <div class="actions">
+      <button type="button" class="btn" data-act="new">New railroad</button>
+      <button type="button" class="btn primary" data-act="keep">Keep playing</button>
+    </div>`, (e) => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'keep') { closeDialog(); game.resume(); }
+    if (act === 'new') { closeDialog(); game.newGame(); }
+  });
+}
+
+// ---- buying a train ----
+
+function routeCargo(state, stations) {
+  const info = stations.map((s) => catchmentCargo(state, s.catchment));
+  const out = [];
+  for (const c of CARGO_IDS) {
+    const loads = stations.filter((s, i) => info[i].supplies.includes(c));
+    const takes = stations.filter((s, i) => info[i].accepts.includes(c));
+    const useful = loads.some((a) => takes.some((b) => b.id !== a.id));
+    if (useful) out.push({ cargo: c, loads, takes });
+  }
+  return out;
+}
+
+function newTrainDialog(game, fromStationId) {
+  const { state } = game;
+  const mine = state.stations.filter((s) => s.owner === 0);
+  if (mine.length < 2) {
+    openDialog(`
+      <h2>Buy a train</h2>
+      <p>A train needs somewhere to go. Build at least two stations first, joined by track.</p>
+      <p class="muted">You have ${mine.length === 0 ? 'no stations' : 'one station'} so far.</p>
+      <div class="actions"><button type="button" class="btn" data-act="close">Close</button><button type="button" class="btn primary" data-act="station">Build a station</button></div>`, (e) => {
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (act) { closeDialog(); game.resume(); }
+      if (act === 'station') game.setTool('station');
+    });
+    return;
+  }
+  const first = mine.find((s) => s.id === fromStationId) || mine[0];
+  const linked = mine.filter((s) => s !== first).sort((a, b) => {
+    const ra = findRoute(state, first.tile, a.tile) ? 0 : 1;
+    const rb = findRoute(state, first.tile, b.tile) ? 0 : 1;
+    return ra - rb || Math.hypot(a.x - first.x, a.y - first.y) - Math.hypot(b.x - first.x, b.y - first.y);
+  });
+  const form = { loco: LOCOS[0].id, stops: [first.id, linked[0].id], cars: {}, error: '' };
+  let carsTouched = false;
+
+  const stationsOf = () => form.stops.map((id) => state.stations.find((s) => s.id === id)).filter(Boolean);
+  const defaultCars = () => {
+    const loco = LOCOS.find((l) => l.id === form.loco);
+    const useful = routeCargo(state, stationsOf()).map((r) => r.cargo);
+    form.cars = {};
+    const order = useful.includes('passengers') ? ['passengers', 'passengers', 'mail', ...useful] : [...useful, ...useful, ...useful];
+    let n = 0;
+    for (const c of order) {
+      if (n >= Math.min(3, loco.maxCars) || !useful.includes(c)) continue;
+      form.cars[c] = (form.cars[c] || 0) + 1;
+      n++;
+    }
+  };
+  defaultCars();
+
+  const draw = () => {
+    const loco = LOCOS.find((l) => l.id === form.loco);
+    const stations = stationsOf();
+    const useful = routeCargo(state, stations);
+    for (const c of Object.keys(form.cars)) if (!useful.some((u) => u.cargo === c)) delete form.cars[c];
+    const carCount = Object.values(form.cars).reduce((a, b) => a + b, 0);
+    const price = trainCost(form.loco, carCount);
+    const gaps = [];
+    for (let i = 0; i < stations.length; i++) {
+      const a = stations[i];
+      const b = stations[(i + 1) % stations.length];
+      if (stations.length === 2 && i === 1) break;
+      if (a.id === b.id) gaps.push(`Stop ${i + 1} and the next stop are the same station.`);
+      else if (!findRoute(state, a.tile, b.tile)) gaps.push(`No track joins ${esc(a.name)} and ${esc(b.name)} yet. The train will wait until you connect them.`);
+    }
+    const options = (selected) => mine.map((s) => `<option value="${s.id}"${s.id === selected ? ' selected' : ''}>${esc(s.name)}</option>`).join('');
+    openDialog(`
+      <h2>Buy a train</h2>
+      <h3>Locomotive</h3>
+      <div class="loco-pick">${LOCOS.map((l) => `
+        <button type="button" class="loco-card${l.id === form.loco ? ' active' : ''}" data-loco="${l.id}">
+          <strong>${l.name}</strong>
+          <span class="specs">${money(l.price)} · pulls up to ${l.maxCars} cars · ${money(l.upkeep)} a year to run</span>
+          <span class="small">${l.blurb}</span>
+        </button>`).join('')}</div>
+      <h3>Stops, in order</h3>
+      ${form.stops.map((id, i) => `
+        <div class="stop-row"><span class="num">${i + 1}</span>
+          <select data-stop="${i}" aria-label="Stop ${i + 1}">${options(id)}</select>
+          ${form.stops.length > 2 ? `<button type="button" class="icon-btn" data-remove="${i}" aria-label="Remove stop ${i + 1}">×</button>` : ''}
+        </div>`).join('')}
+      ${form.stops.length < 6 ? '<button type="button" class="btn" data-act="addStop">Add a stop</button>' : ''}
+      ${gaps.map((g) => `<p class="warn">${g}</p>`).join('')}
+      <h3>Cars (${carCount} of ${loco.maxCars}) · ${money(CAR.price)} each</h3>
+      ${useful.length ? useful.map(({ cargo, loads, takes }) => `
+        <div class="car-row">
+          <span class="what"><i style="background:${CARGO[cargo].color}"></i>${CARGO[cargo].name}</span>
+          <span class="counter">
+            <button type="button" data-car="${cargo}" data-delta="-1" aria-label="One fewer ${CARGO[cargo].name} car"${form.cars[cargo] ? '' : ' disabled'}>−</button>
+            <span>${form.cars[cargo] || 0}</span>
+            <button type="button" data-car="${cargo}" data-delta="1" aria-label="One more ${CARGO[cargo].name} car"${carCount < loco.maxCars ? '' : ' disabled'}>+</button>
+          </span>
+          <span class="note">Loads at ${loads.map((s) => esc(s.name)).join(', ')} · delivers to ${takes.map((s) => esc(s.name)).join(', ')}</span>
+        </div>`).join('') : '<p class="warn">None of these stops have cargo another stop wants. Try a station by a town plus one by another town, or a coal mine plus a steel mill.</p>'}
+      <div class="total-line"><span>Total price</span><strong>${money(price)}</strong></div>
+      ${form.error ? `<p class="warn">${esc(form.error)}</p>` : ''}
+      <div class="actions">
+        <button type="button" class="btn" data-act="cancel">Cancel</button>
+        <button type="button" class="btn primary" data-act="buy"${carCount && price <= state.companies[0].cash ? '' : ' disabled'}>${price > state.companies[0].cash ? 'Not enough cash' : 'Buy train'}</button>
+      </div>`, onClick);
+    $('dialog').onchange = (e) => {
+      const i = e.target.dataset.stop;
+      if (i === undefined) return;
+      form.stops[Number(i)] = Number(e.target.value);
+      if (!carsTouched) defaultCars();
+      draw();
+    };
+  };
+
+  const onClick = (e) => {
+    const el = e.target.closest('button');
+    if (!el) return;
+    form.error = '';
+    if (el.dataset.loco) {
+      form.loco = el.dataset.loco;
+      const max = LOCOS.find((l) => l.id === form.loco).maxCars;
+      let n = 0;
+      for (const c of Object.keys(form.cars)) {
+        form.cars[c] = Math.max(0, Math.min(form.cars[c], max - n));
+        n += form.cars[c];
+      }
+    } else if (el.dataset.car) {
+      form.cars[el.dataset.car] = Math.max(0, (form.cars[el.dataset.car] || 0) + Number(el.dataset.delta));
+      carsTouched = true;
+    } else if (el.dataset.remove !== undefined) {
+      form.stops.splice(Number(el.dataset.remove), 1);
+    } else if (el.dataset.act === 'addStop') {
+      const last = form.stops[form.stops.length - 1];
+      const next = mine.find((s) => s.id !== last && !form.stops.includes(s.id)) || mine.find((s) => s.id !== last);
+      form.stops.push(next.id);
+      if (!carsTouched) defaultCars();
+    } else if (el.dataset.act === 'cancel') {
+      closeDialog();
+      game.resume();
+      return;
+    } else if (el.dataset.act === 'buy') {
+      const cars = [];
+      for (const c of CARGO_IDS) for (let i = 0; i < (form.cars[c] || 0); i++) cars.push(c);
+      const res = game.run({ type: 'buyTrain', loco: form.loco, cars, stops: form.stops });
+      if (res.ok) {
+        closeDialog();
+        game.select({ kind: 'train', id: res.train.id });
+        game.resume();
+        return;
+      }
+      form.error = res.error;
+    } else {
+      return;
+    }
+    draw();
+  };
+  draw();
+}
+
+// ---- src/main.js ----
+// Starts the game in the browser: the clock, mouse and touch input, tools, and saving.
+
+
+
+
+
+
+
+
+
+
+
+const SAVE_KEY = 'coin-express-save-v1';
+const TICKS_PER_SECOND = [0, 8, 24, 72]; // normal speed: one game day per second
+const TOOL_KEYS = { 1: 'inspect', 2: 'track', 3: 'station', 4: 'bulldoze' };
+
+const canvas = document.getElementById('map');
+const ctx = canvas.getContext('2d');
+const el = (id) => document.getElementById(id);
+
+const view = {
+  cam: { x: 0, y: 0, zoom: 1 },
+  w: 0, h: 0, dpr: 1,
+  tool: 'inspect',
+  hoverTile: -1,
+  trackStart: -1,
+  preview: null,
+  stationCheck: null,
+  selected: null,
+  floats: [],
+  trackDirty: true,
+};
+
+const game = {
+  state: null,
+  view,
+  speed: 1,
+  pausedSpeed: 1,
+  terrain: null,
+  run,
+  select,
+  setTool,
+  resume,
+  newGame,
+};
+
+let errorText = '';
+let errorUntil = 0;
+let lastTop = null;
+let tickBudget = 0;
+
+// ---- saving ----
+
+function serialize() {
+  return JSON.stringify({ ...game.state, events: [] });
+}
+
+function save() {
+  try {
+    localStorage.setItem(SAVE_KEY, serialize());
+  } catch (e) {
+    // Storage can be blocked (private windows); the game still plays.
+  }
+}
+
+function loadSave() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ---- game control ----
+
+function useState(state) {
+  game.state = state;
+  game.terrain = buildTerrainCache(state);
+  view.selected = null;
+  view.trackStart = -1;
+  view.preview = null;
+  view.trackDirty = true;
+  view.floats = [];
+  lastTop = state.messages[0] || null;
+  el('ticker').innerHTML = '';
+  fitCamera();
+  renderPanel(game, true);
+}
+
+function newGame() {
+  useState(createGame());
+  save();
+  game.speed = 1;
+  updateSpeedButtons();
+}
+
+function resume() {
+  if (game.speed === 0 && game.pausedSpeed) game.speed = game.pausedSpeed;
+  updateSpeedButtons();
+}
+
+function pauseForDialog() {
+  if (game.speed !== 0) game.pausedSpeed = game.speed;
+  game.speed = 0;
+  updateSpeedButtons();
+}
+
+function run(cmd) {
+  const res = dispatch(game.state, { company: 0, ...cmd });
+  if (res.ok) {
+    view.trackDirty = true;
+    view.preview = null;
+    renderPanel(game, true);
+  } else {
+    flashError(res.error);
+  }
+  return res;
+}
+
+function select(sel) {
+  view.selected = sel;
+  el('panel').classList.remove('collapsed');
+  renderPanel(game, true);
+}
+
+function setTool(tool) {
+  view.tool = tool;
+  view.trackStart = -1;
+  view.preview = null;
+  for (const b of document.querySelectorAll('.tool[data-tool]')) b.classList.toggle('active', b.dataset.tool === tool);
+  updateHint();
+}
+
+function flashError(text) {
+  errorText = text;
+  errorUntil = performance.now() + 3500;
+  updateHint();
+}
+
+function updateSpeedButtons() {
+  for (const b of document.querySelectorAll('.speed-btn')) b.classList.toggle('active', Number(b.dataset.speed) === game.speed);
+}
+
+// ---- hints under the cursor ----
+
+function cargoNames(list) {
+  return list.length ? list.map((c) => c[0].toUpperCase() + c.slice(1)).join(', ') : 'nothing';
+}
+
+function updateHint() {
+  const hint = el('hint');
+  const now = performance.now();
+  let html = '';
+  if (view.tool === 'inspect') {
+    html = 'Click anything on the map to see details. Drag to move the map, scroll or pinch to zoom.';
+  } else if (view.tool === 'track') {
+    if (view.trackStart < 0) html = 'Click where the new track should <b>start</b>.';
+    else if (view.preview) {
+      const p = view.preview;
+      html = p.cost === 0
+        ? 'That track is already built. Click to continue from there.'
+        : `Click to build: <b>${money(p.cost)}</b> for ${p.path.length - 1} tiles.${p.affordable ? '' : ' <span class="err">Not enough cash.</span>'} Right-click or Esc to stop.`;
+    } else html = 'Click where the track should <b>end</b>. Right-click or Esc to stop.';
+  } else if (view.tool === 'station') {
+    const c = view.stationCheck;
+    if (!c) html = `Click a tile that has track. A station costs <b>${money(COSTS.station)}</b>.`;
+    else if (!c.ok) html = `<span class="err">${c.reason}</span>`;
+    else html = `Build here for <b>${money(COSTS.station)}</b>. Picks up: ${cargoNames(c.cargo.supplies)}. Delivers: ${cargoNames(c.cargo.accepts)}.`;
+  } else if (view.tool === 'bulldoze') {
+    html = 'Click your track or a station to remove it. You get a quarter of the cost back.';
+  }
+  if (errorText && now < errorUntil) html = `<span class="err">${errorText}</span>`;
+  if (hint.innerHTML !== html) hint.innerHTML = html;
+}
+
+function checkStation(tile) {
+  const { state } = game;
+  if (tile < 0) return null;
+  const x = tileX(state.map, tile);
+  const y = tileY(state.map, tile);
+  const cargo = catchmentCargo(state, catchmentAt(state, tile));
+  if (!tileHasTrack(state, tile)) return { ok: false, reason: 'Stations go on a tile that already has track.', cargo };
+  if (state.stations.some((s) => s.tile === tile)) return { ok: false, reason: 'There is already a station here.', cargo };
+  if (state.stations.some((s) => Math.max(Math.abs(s.x - x), Math.abs(s.y - y)) < 3)) return { ok: false, reason: 'Too close to another station.', cargo };
+  return { ok: true, cargo };
+}
+
+function setHover(tile) {
+  if (tile === view.hoverTile) return;
+  view.hoverTile = tile;
+  const { state } = game;
+  if (view.tool === 'track' && view.trackStart >= 0 && tile >= 0) {
+    const plan = planTrack(state, view.trackStart, tile);
+    view.preview = plan ? { ...plan, affordable: plan.cost <= state.companies[0].cash } : null;
+  } else view.preview = null;
+  view.stationCheck = view.tool === 'station' ? checkStation(tile) : null;
+  updateHint();
+}
+
+// ---- clicking the map ----
+
+function trainNear(tile) {
+  const { state } = game;
+  let best = null;
+  for (const t of state.trains) {
+    const d = Math.max(Math.abs(tileX(state.map, t.tile) - tileX(state.map, tile)), Math.abs(tileY(state.map, t.tile) - tileY(state.map, tile)));
+    if (d <= 1 && (!best || d < best.d)) best = { t, d };
+  }
+  return best && best.t;
+}
+
+function clickTile(tile) {
+  const { state } = game;
+  if (tile < 0) return;
+  if (view.tool === 'inspect') {
+    const station = state.stations.find((s) => s.tile === tile);
+    const train = trainNear(tile);
+    if (train && !(station && train.status === 'loading' && view.selected?.kind === 'train')) select({ kind: 'train', id: train.id });
+    else if (station) select({ kind: 'station', id: station.id });
+    else if (state.map.industry[tile] >= 0) select({ kind: 'industry', id: state.map.industry[tile] });
+    else if (state.map.town[tile] >= 0) select({ kind: 'town', id: state.map.town[tile] });
+    else select(null);
+    return;
+  }
+  if (view.tool === 'track') {
+    if (view.trackStart < 0) {
+      if (state.map.industry[tile] >= 0) {
+        flashError('Track cannot go through an industry.');
+        return;
+      }
+      view.trackStart = tile;
+      view.hoverTile = -1;
+      setHover(tile);
+      updateHint();
+      return;
+    }
+    if (tile === view.trackStart) return;
+    const plan = planTrack(state, view.trackStart, tile);
+    if (plan && plan.cost === 0) {
+      view.trackStart = tile;
+    } else {
+      const res = run({ type: 'buildTrack', from: view.trackStart, to: tile });
+      if (res.ok) view.trackStart = tile; // keep going from the end
+    }
+    view.hoverTile = -1;
+    setHover(tile);
+    return;
+  }
+  if (view.tool === 'station') {
+    const res = run({ type: 'buildStation', tile });
+    if (res.ok) select({ kind: 'station', id: res.station.id });
+    view.stationCheck = checkStation(tile);
+    updateHint();
+    return;
+  }
+  if (view.tool === 'bulldoze') {
+    const res = run({ type: 'bulldoze', tile });
+    if (res.ok && view.selected?.kind === 'station' && !state.stations.some((s) => s.id === view.selected.id)) select(null);
+  }
+}
+
+// ---- camera and pointer input ----
+
+function resize() {
+  view.dpr = Math.min(window.devicePixelRatio || 1, 2);
+  view.w = canvas.clientWidth;
+  view.h = canvas.clientHeight;
+  canvas.width = Math.round(view.w * view.dpr);
+  canvas.height = Math.round(view.h * view.dpr);
+}
+
+function clampCamera() {
+  const { map } = game.state;
+  view.cam.zoom = Math.max(0.3, Math.min(2.6, view.cam.zoom));
+  // Keep the map filling the screen where it is big enough to; centre it where not.
+  const clampAxis = (c, size, screen) => {
+    const half = screen / 2 / view.cam.zoom;
+    return size > half * 2 ? Math.max(half, Math.min(size - half, c)) : size / 2;
+  };
+  view.cam.x = clampAxis(view.cam.x, map.w * TILE, view.w);
+  view.cam.y = clampAxis(view.cam.y, map.h * TILE, view.h);
+}
+
+function fitCamera() {
+  const { map } = game.state;
+  // Fill the screen; the edges of the map are a drag away.
+  view.cam.zoom = Math.max(0.45, view.w / (map.w * TILE), view.h / (map.h * TILE));
+  view.cam.x = (map.w * TILE) / 2;
+  view.cam.y = (map.h * TILE) / 2;
+  clampCamera();
+}
+
+function zoomAt(sx, sy, factor) {
+  const before = { x: (sx - view.w / 2) / view.cam.zoom + view.cam.x, y: (sy - view.h / 2) / view.cam.zoom + view.cam.y };
+  view.cam.zoom *= factor;
+  clampCamera();
+  view.cam.x = before.x - (sx - view.w / 2) / view.cam.zoom;
+  view.cam.y = before.y - (sy - view.h / 2) / view.cam.zoom;
+  clampCamera();
+}
+
+const pointers = new Map();
+let drag = null;
+let pinch = null;
+
+canvas.addEventListener('pointerdown', (e) => {
+  canvas.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y) };
+    drag = null;
+    return;
+  }
+  drag = { x: e.offsetX, y: e.offsetY, moved: false, button: e.button };
+});
+
+canvas.addEventListener('pointermove', (e) => {
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+  if (pinch && pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    const dist = Math.hypot(a.x - b.x, a.y - b.y);
+    zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, dist / pinch.dist);
+    pinch.dist = dist;
+    return;
+  }
+  if (drag) {
+    const dx = e.offsetX - drag.x;
+    const dy = e.offsetY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) > 6) {
+      drag.moved = true;
+      canvas.classList.add('panning');
+    }
+    if (drag.moved) {
+      view.cam.x -= dx / view.cam.zoom;
+      view.cam.y -= dy / view.cam.zoom;
+      clampCamera();
+      drag.x = e.offsetX;
+      drag.y = e.offsetY;
+      return;
+    }
+  }
+  if (e.pointerType === 'mouse' || !drag) setHover(screenToTile(view, game.state.map, e.offsetX, e.offsetY));
+});
+
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (pinch) {
+    if (pointers.size < 2) pinch = null;
+    drag = null;
+    return;
+  }
+  if (drag && !drag.moved) {
+    const tile = screenToTile(view, game.state.map, e.offsetX, e.offsetY);
+    if (drag.button === 2) {
+      view.trackStart = -1;
+      view.preview = null;
+      updateHint();
+    } else {
+      if (e.pointerType !== 'mouse') setHover(tile);
+      clickTile(tile);
+    }
+  }
+  drag = null;
+  canvas.classList.remove('panning');
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', (e) => {
+  pointers.delete(e.pointerId);
+  drag = null;
+  pinch = null;
+});
+canvas.addEventListener('pointerleave', (e) => {
+  if (e.pointerType === 'mouse') setHover(-1);
+});
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  zoomAt(e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.0015));
+}, { passive: false });
+
+window.addEventListener('keydown', (e) => {
+  if (!el('modal').hidden || e.target.closest('input, select, textarea')) {
+    if (e.key === 'Escape' && !el('modal').hidden) {
+      closeDialog();
+      resume();
+    }
+    return;
+  }
+  if (TOOL_KEYS[e.key]) setTool(TOOL_KEYS[e.key]);
+  else if (e.key === '5') openNewTrain();
+  else if (e.key === 'Escape') {
+    if (view.trackStart >= 0) {
+      view.trackStart = -1;
+      view.preview = null;
+      updateHint();
+    } else setTool('inspect');
+  } else if (e.key === ' ') {
+    e.preventDefault();
+    if (game.speed === 0) game.speed = game.pausedSpeed || 1;
+    else {
+      game.pausedSpeed = game.speed;
+      game.speed = 0;
+    }
+    updateSpeedButtons();
+  } else if (e.key === '+' || e.key === '=') zoomAt(view.w / 2, view.h / 2, 1.2);
+  else if (e.key === '-') zoomAt(view.w / 2, view.h / 2, 1 / 1.2);
+  else if (e.key.startsWith('Arrow')) {
+    const d = 120 / view.cam.zoom;
+    if (e.key === 'ArrowLeft') view.cam.x -= d;
+    if (e.key === 'ArrowRight') view.cam.x += d;
+    if (e.key === 'ArrowUp') view.cam.y -= d;
+    if (e.key === 'ArrowDown') view.cam.y += d;
+    clampCamera();
+  }
+});
+
+// ---- buttons ----
+
+function openNewTrain(fromStationId) {
+  pauseForDialog();
+  newTrainDialog(game, fromStationId);
+}
+
+for (const b of document.querySelectorAll('.tool[data-tool]')) b.addEventListener('click', () => setTool(b.dataset.tool));
+el('new-train-btn').addEventListener('click', () => openNewTrain(view.selected?.kind === 'station' ? view.selected.id : undefined));
+for (const b of document.querySelectorAll('.speed-btn')) {
+  b.addEventListener('click', () => {
+    game.speed = Number(b.dataset.speed);
+    if (game.speed) game.pausedSpeed = game.speed;
+    updateSpeedButtons();
+  });
+}
+el('help-btn').addEventListener('click', () => {
+  pauseForDialog();
+  helpDialog(game);
+});
+el('menu-btn').addEventListener('click', () => {
+  pauseForDialog();
+  menuDialog(game);
+});
+el('modal').addEventListener('click', (e) => {
+  if (e.target === el('modal')) {
+    closeDialog();
+    resume();
+  }
+});
+
+// Rows in the panel are redrawn often, so they act on pointerdown.
+el('panel').addEventListener('pointerdown', (e) => {
+  const row = e.target.closest('[data-select]');
+  if (!row) return;
+  const [kind, id] = row.dataset.select.split(':');
+  select({ kind, id: Number(id) });
+});
+el('panel').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) {
+    if (e.target.closest('.panel-head') && window.matchMedia('(max-width: 720px)').matches) el('panel').classList.toggle('collapsed');
+    return;
+  }
+  const act = btn.dataset.action;
+  if (act === 'deselect') select(null);
+  if (act === 'newTrain') openNewTrain(btn.dataset.from ? Number(btn.dataset.from) : undefined);
+  if (act === 'sellTrain') {
+    if (btn.dataset.confirm) {
+      const res = run({ type: 'sellTrain', trainId: Number(btn.dataset.id) });
+      if (res.ok) select(null);
+    } else {
+      btn.dataset.confirm = '1';
+      btn.textContent = 'Tap again to sell';
+    }
+  }
+});
+
+// ---- the clock ----
+
+function drainEvents(now) {
+  const { state } = game;
+  for (const ev of state.events) {
+    if (ev.type === 'cash') view.floats.push({ tile: ev.tile, text: `+${money(ev.amount)}`, born: now });
+    if (ev.type === 'outcome') {
+      pauseForDialog();
+      outcomeDialog(game, ev.outcome);
+    }
+  }
+  state.events.length = 0;
+  // New news lines go to the ticker for a few seconds.
+  const fresh = [];
+  for (const m of state.messages) {
+    if (m === lastTop) break;
+    fresh.push(m);
+  }
+  lastTop = state.messages[0] || null;
+  const ticker = el('ticker');
+  for (const m of fresh.slice(0, 3).reverse()) {
+    const div = document.createElement('div');
+    div.className = m.kind;
+    div.textContent = m.text;
+    ticker.prepend(div);
+    setTimeout(() => div.remove(), 6000);
+  }
+  while (ticker.children.length > 3) ticker.lastChild.remove();
+}
+
+let lastFrame = performance.now();
+let lastHud = 0;
+function frame(now) {
+  const dt = Math.min(0.25, (now - lastFrame) / 1000);
+  lastFrame = now;
+  const { state } = game;
+  tickBudget += dt * TICKS_PER_SECOND[game.speed];
+  const startMonth = Math.floor(gameDay(state) / DAYS_PER_MONTH);
+  let n = 0;
+  while (tickBudget >= 1 && n < 400) {
+    step(state);
+    tickBudget--;
+    n++;
+  }
+  if (!game.speed) tickBudget = 0;
+  if (Math.floor(gameDay(state) / DAYS_PER_MONTH) !== startMonth) save();
+  drainEvents(now);
+  drawFrame(ctx, state, view, game.terrain, now);
+  if (now - lastHud > 250) {
+    lastHud = now;
+    renderTopbar(game);
+    renderPanel(game, false);
+    updateHint();
+  }
+  requestAnimationFrame(frame);
+}
+
+function start(data) {
+  resize();
+  const saved = (data && data.save && JSON.parse(data.save)) || loadSave();
+  useState(saved || createGame());
+  setTool('inspect');
+  if (window.matchMedia('(max-width: 720px)').matches) el('panel').classList.add('collapsed');
+  if (data && data.save) {
+    updateSpeedButtons();
+  } else {
+    pauseForDialog();
+    welcomeDialog(game, Boolean(saved));
+  }
+  window.claude?.hot?.snapshot?.(() => ({ save: serialize() }));
+  window.addEventListener('resize', () => {
+    resize();
+    clampCamera();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) save();
+  });
+  requestAnimationFrame(frame);
+}
+
+if (window.claude?.hot?.ready) window.claude.hot.ready(start);
+else start(window.claude?.hot?.data ?? {});
+
+window.coinExpress = game; // handy for poking at the game from the browser console
+
+})();
+</script>
